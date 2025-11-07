@@ -1,0 +1,19 @@
+{
+  "name": "racing-portal-mysql",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Horse racing analysis portal (login + races 1–12 + DB tabs) with MySQL",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.17.3",
+    "http-proxy-middleware": "^3.0.5",
+    "mysql2": "^3.9.7"
+  }
+}

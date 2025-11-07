@@ -1,0 +1,592 @@
+<!doctype html>
+<html lang="zh-HK">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>賽馬數據面板（賽日＋歷史＋馬匹/騎師/練馬師）</title>
+<style>
+  :root{
+    --bg: #0f1115;
+    --panel: #171a21;
+    --muted: #9aa4b2;
+    --text: #e6ebf2;
+    --primary: #4da3ff;
+    --accent: #7ee081;
+    --danger: #ff6b6b;
+    --border: #2a2f3a;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --bg: #f6f7fb; --panel:#fff; --muted:#5e6a77; --text:#1b2430;
+      --primary:#1864ff; --accent:#129b45; --danger:#c42525; --border:#e7eaf0;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto}
+
+  /* ===== Top App Bar (Menu) ===== */
+  .appbar{position:sticky;top:0;z-index:50;background:var(--panel);border-bottom:1px solid var(--border)}
+  .appbar .row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.65rem 1rem}
+  .brand{font-weight:700;letter-spacing:.3px}
+  .menubar{display:flex;gap:.25rem;flex-wrap:wrap}
+  .menu-btn{border:1px solid var(--border);background:transparent;color:var(--text);padding:.4rem .7rem;border-radius:.6rem;cursor:pointer}
+  .menu-btn[aria-current="page"]{background:rgba(77,163,255,.16);border-color:transparent}
+  .menu-spacer{flex:1}
+
+  /* ===== Secondary Controls (contextual, under menubar) ===== */
+  header.controls{position:sticky;top:44px;z-index:40;display:flex;gap:.75rem;align-items:center;justify-content:space-between;padding:.6rem 1rem;border-bottom:1px solid var(--border);background:linear-gradient(0deg,var(--panel),var(--panel))}
+  .btn{border:1px solid var(--border);background:transparent;color:var(--text);padding:.45rem .7rem;border-radius:.55rem;cursor:pointer}
+  .btn.primary{border-color:transparent;background:var(--primary);color:#fff}
+  .btn.accent{border-color:transparent;background:var(--accent);color:#0b110d}
+  .btn.danger{border-color:transparent;background:var(--danger);color:#fff}
+  .field{display:flex;gap:.4rem;align-items:center;background:var(--panel);border:1px solid var(--border);padding:.35rem .55rem;border-radius:.55rem}
+  .field input, .field select{background:transparent;border:0;outline:0;color:var(--text);min-width:0}
+
+  /* ===== Layouts for different views ===== */
+  main{padding:1rem}
+  .view{display:none}
+  .view.active{display:block}
+
+  /* Meeting layout (left list + right content) */
+  .grid-meeting{display:grid;grid-template-columns:280px 1fr;gap:1rem}
+  aside{background:var(--panel);border:1px solid var(--border);border-radius:.8rem;overflow:hidden}
+  .aside-head{display:flex;gap:.5rem;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);padding:.65rem .8rem}
+  .race-list{max-height:calc(100vh - 260px);overflow:auto}
+  .race-item{padding:.65rem .8rem;border-top:1px dashed var(--border);display:grid;grid-template-columns:28px 1fr auto;gap:.5rem;align-items:center;cursor:pointer}
+  .race-item:first-child{border-top:0}
+  .race-item.active{background:rgba(77,163,255,.12)}
+  .race-item small{color:var(--muted)}
+  .badge{font-size:.75rem;padding:.1rem .4rem;border-radius:.35rem;border:1px solid var(--border);color:var(--muted)}
+  .badge.live{color:#fff;background:var(--danger);border-color:transparent}
+  section#content{background:var(--panel);border:1px solid var(--border);border-radius:.8rem;min-height:480px}
+  .tabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);padding:.2rem}
+  .tab{padding:.55rem .9rem;border-radius:.55rem;cursor:pointer;color:var(--muted)}
+  .tab.active{background:rgba(77,163,255,.15);color:var(--text)}
+  .panel{display:none;padding:1rem}
+  .panel.active{display:block}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:.8rem}
+  .card{border:1px solid var(--border);border-radius:.65rem;padding:.9rem}
+  .kv{display:grid;grid-template-columns:120px 1fr;gap:.35rem .6rem}
+  .kv div{padding:.15rem 0;border-bottom:1px dashed var(--border)}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{border-bottom:1px solid var(--border);padding:.55rem .4rem;text-align:left}
+  .table th{color:var(--muted);font-weight:600}
+  .muted{color:var(--muted)}
+
+  /* Horses/Jockeys/Trainers views */
+  .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem}
+  .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:.8rem;overflow:hidden}
+
+  /* History drawer */
+  .drawer{position:fixed;right:0;top:0;height:100%;width:min(420px,92vw);background:var(--panel);border-left:1px solid var(--border);transform:translateX(100%);transition:.28s ease;z-index:60}
+  .drawer.open{transform:none}
+  .drawer header{position:sticky;top:0}
+  .history-list{padding:.75rem;display:flex;flex-direction:column;gap:.5rem;max-height:calc(100% - 64px);overflow:auto}
+  .history-item{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--border);padding:.6rem .7rem;border-radius:.55rem}
+  .empty{padding:1rem;color:var(--muted)}
+
+  @media (max-width: 980px){
+    .grid-meeting{grid-template-columns:1fr}
+    .race-list{max-height:unset}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== App Menu Bar ===== -->
+<div class="appbar">
+  <div class="row">
+    <div class="brand">HKJC 面板</div>
+    <nav class="menubar" id="menubar">
+      <button class="menu-btn" data-view="meeting" aria-current="page">賽日</button>
+      <button class="menu-btn" data-view="horses">馬匹</button>
+      <button class="menu-btn" data-view="jockeys">騎師</button>
+      <button class="menu-btn" data-view="trainers">練馬師</button>
+      <button class="menu-btn" data-view="stats">統計</button>
+      <span class="menu-spacer"></span>
+      <button class="menu-btn" data-view="settings">系統</button>
+    </nav>
+  </div>
+</div>
+
+<!-- ===== Context controls (change with view) ===== -->
+<header class="controls" id="controls">
+  <div class="left" id="controls-left"></div>
+  <div class="right" id="controls-right"></div>
+</header>
+
+<main>
+  <!-- ===== View: Meeting (原本賽日介面) ===== -->
+  <div class="view active" id="view-meeting">
+    <div class="grid-meeting">
+      <aside>
+        <div class="aside-head">
+          <strong>賽日總覽</strong>
+          <span class="muted" id="summary"></span>
+        </div>
+        <div id="raceList" class="race-list"></div>
+      </aside>
+
+      <section id="content">
+        <div class="tabs" id="tabs">
+          <div class="tab active" data-tab="basic">基本資料</div>
+          <div class="tab" data-tab="odds">賠率 / 投注池</div>
+          <div class="tab" data-tab="runners">馬匹名單</div>
+        </div>
+
+        <div class="panel active" id="panel-basic">
+          <div class="cards" id="basicCards"></div>
+        </div>
+
+        <div class="panel" id="panel-odds">
+          <div class="table-wrap">
+            <table class="table" id="oddsTable">
+              <thead><tr>
+                <th>馬號</th><th>馬名</th><th>獨贏</th><th>位置</th><th class="muted">更新</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="muted">（示例數據；接駁你爬蟲/JSON 後自動更新）</p>
+        </div>
+
+        <div class="panel" id="panel-runners">
+          <div class="table-wrap">
+            <table class="table" id="runnersTable">
+              <thead><tr>
+                <th>馬號</th><th>馬名（中/英）</th><th>評分</th><th>騎師</th><th>練馬師</th><th>檔位</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- ===== View: Horses ===== -->
+  <div class="view" id="view-horses">
+    <div class="toolbar">
+      <div class="field"><span class="muted">搜尋</span><input id="qHorses" placeholder="馬名 / 編號 / 血統" /></div>
+      <div class="field"><span class="muted">性別</span>
+        <select id="sexFilter"><option value="">全部</option><option>閹</option><option>雄</option><option>雌</option></select>
+      </div>
+      <div class="field"><span class="muted">評分 ≥</span><input id="ratingMin" type="number" min="0" max="140" style="width:84px"></div>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="horsesTable">
+        <thead><tr>
+          <th>編號</th><th>馬名（中/英）</th><th>性別</th><th>年齡</th><th>評分</th><th>練馬師</th><th>近績</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== View: Jockeys ===== -->
+  <div class="view" id="view-jockeys">
+    <div class="toolbar">
+      <div class="field"><span class="muted">搜尋</span><input id="qJockeys" placeholder="騎師名 / 國籍" /></div>
+      <div class="field"><span class="muted">見習</span>
+        <select id="claimFilter"><option value="">全部</option><option value="Y">見習</option><option value="N">非見習</option></select>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="jockeysTable">
+        <thead><tr>
+          <th>#</th><th>騎師</th><th>出賽</th><th>冠</th><th>亞</th><th>季</th><th>冠率</th><th>累計獎金</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== View: Trainers ===== -->
+  <div class="view" id="view-trainers">
+    <div class="toolbar">
+      <div class="field"><span class="muted">搜尋</span><input id="qTrainers" placeholder="練馬師名" /></div>
+    </div>
+    <div class="table-wrap">
+      <table class="table" id="trainersTable">
+        <thead><tr>
+          <th>#</th><th>練馬師</th><th>出賽</th><th>冠</th><th>亞</th><th>季</th><th>冠率</th><th>累計獎金</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== View: Stats (示例) ===== -->
+  <div class="view" id="view-stats">
+    <div class="cards">
+      <div class="card"><h3 style="margin:.2rem 0 .6rem">統計（示例）</h3>
+        <div class="kv">
+          <div class="muted">活躍馬匹</div><div id="stat-horses">—</div>
+          <div class="muted">在册騎師</div><div id="stat-jockeys">—</div>
+          <div class="muted">在册練馬師</div><div id="stat-trainers">—</div>
+        </div>
+      </div>
+      <div class="card"><h4 style="margin:.2rem 0 .4rem">提示</h4>
+        <p class="muted">這裡可接你的資料庫做趨勢圖（如：每場投注額、各班次勝率等）。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== View: Settings ===== -->
+  <div class="view" id="view-settings">
+    <div class="cards">
+      <div class="card">
+        <h3 style="margin:.2rem 0 .6rem">系統設定</h3>
+        <div class="kv">
+          <div class="muted">API 節流（秒）</div><div><input id="throttle" type="number" value="30" style="width:96px"></div>
+          <div class="muted">自動刷新</div><div><select id="autoRefresh"><option value="off">關閉</option><option value="on">開啟</option></select></div>
+        </div>
+      </div>
+      <div class="card">
+        <h4 style="margin:.2rem 0 .4rem">資料來源</h4>
+        <p class="muted">把你的抓取端點 / 後端 API 位址填在 JS 的 fetch 區段。</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- 歷史抽屜 -->
+<div class="drawer" id="drawer">
+  <header class="row" style="padding:.6rem 1rem"><strong>歷史賽日</strong></header>
+  <div class="history-list" id="historyList">
+    <div class="empty">尚未封存任何賽日。</div>
+  </div>
+</div>
+
+<script>
+// 後端 Flask API
+const API_BASE = 'http://127.0.0.1:5000';
+
+
+/****************************
+ * Demo 數據與狀態
+ ****************************/
+const demoRace = (no) => ({
+  no,
+  time: ["12:45","13:15","13:50","14:20","14:50","15:20","15:55","16:25","17:00","17:35","18:05","18:40"][no-1],
+  course: (no%2? "草地":"全天候"),
+  distance: (no%2? 1200:1650),
+  going: "好",
+  status: "預定",
+  runners: Array.from({length: 14}, (_,i)=>({
+    draw: i+1,
+    num: (i+1),
+    name_zh: `示例馬${i+1}`,
+    name_en: `Demo Horse ${i+1}`,
+    rating: 60 + ((i*3)%20),
+    jockey: `騎師${(i%6)+1}`,
+    trainer: `練馬師${(i%5)+1}`,
+    win: (3.2 + (Math.random()*10)).toFixed(1),
+    pla: (1.6 + (Math.random()*6)).toFixed(1),
+    updated_at: new Date().toLocaleTimeString()
+  }))
+});
+const todayISO = new Date().toISOString().slice(0,10);
+
+const state = {
+  view: 'meeting',
+  raceDate: todayISO,
+  venue: 'ST',
+  races: Array.from({length:12}, (_,i)=> demoRace(i+1)),
+  activeRaceNo: 1,
+  tab: 'basic',
+  history: loadHistory(),
+  // 其他視圖示例數據
+  horses: [],   // 由 API 載入
+
+  jockeys: Array.from({length:12}, (_,i)=> ({
+    id: i+1, name: `騎師${i+1}`, runs: 120+i*7, win: 20+i, place2: 28+i*2, place3: 30+i*2, prize: 3000000+i*80000, claim: (i%4===0)
+  })),
+  trainers: Array.from({length:10}, (_,i)=> ({
+    id: i+1, name: `練馬師${i+1}`, runs: 160+i*9, win: 18+i, place2: 31+i*2, place3: 33+i*2, prize: 5200000+i*120000
+  }))
+};
+
+/****************************
+ * 儲存/讀取 歷史
+ ****************************/
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem('hkjc_history')||'[]'); }catch(e){ return [] }
+}
+function saveHistory(list){ localStorage.setItem('hkjc_history', JSON.stringify(list)); }
+
+/****************************
+ * 元素引用
+ ****************************/
+const el = {
+  menubar: document.getElementById('menubar'),
+  controlsLeft: document.getElementById('controls-left'),
+  controlsRight: document.getElementById('controls-right'),
+  views: {
+    meeting: document.getElementById('view-meeting'),
+    horses: document.getElementById('view-horses'),
+    jockeys: document.getElementById('view-jockeys'),
+    trainers: document.getElementById('view-trainers'),
+    stats: document.getElementById('view-stats'),
+    settings: document.getElementById('view-settings')
+  },
+  // meeting view
+  raceList: document.getElementById('raceList'),
+  summary: document.getElementById('summary'),
+  tabs: document.getElementById('tabs'),
+  basicCards: document.getElementById('basicCards'),
+  oddsTableBody: document.querySelector('#oddsTable tbody'),
+  runnersTableBody: document.querySelector('#runnersTable tbody'),
+  // entity tables
+  horsesTableBody: document.querySelector('#horsesTable tbody'),
+  jockeysTableBody: document.querySelector('#jockeysTable tbody'),
+  trainersTableBody: document.querySelector('#trainersTable tbody'),
+  // history drawer
+  drawer: document.getElementById('drawer'),
+  historyList: document.getElementById('historyList'),
+};
+
+/****************************
+ * 控制列：依視圖變化
+ ****************************/
+function renderControls(){
+  const left = el.controlsLeft, right = el.controlsRight;
+  left.innerHTML = ''; right.innerHTML='';
+  if(state.view==='meeting'){
+    left.innerHTML = `
+      <div class="field"><label class="muted">賽日</label><input id="raceDate" type="date" value="${state.raceDate}"></div>
+      <div class="field"><label class="muted">場地</label>
+        <select id="venue"><option value="ST" ${state.venue==='ST'?'selected':''}>沙田 ST</option><option value="HV" ${state.venue==='HV'?'selected':''}>跑馬地 HV</option></select>
+      </div>
+      <button class="btn primary" id="btnLoad">載入最新賽日</button>`;
+    right.innerHTML = `<button class="btn" id="btnOpenHistory">歷史</button><button class="btn accent" id="btnArchive">封存當日</button>`;
+  } else if(state.view==='horses'){
+    left.innerHTML = `<strong>馬匹清單</strong>`;
+  } else if(state.view==='jockeys'){
+    left.innerHTML = `<strong>騎師名單</strong>`;
+  } else if(state.view==='trainers'){
+    left.innerHTML = `<strong>練馬師名單</strong>`;
+  } else if(state.view==='stats'){
+    left.innerHTML = `<strong>統計</strong>`;
+  } else if(state.view==='settings'){
+    left.innerHTML = `<strong>系統設定</strong>`;
+  }
+
+  // 重新綁定 meeting 控件事件
+  if(state.view==='meeting'){
+    document.getElementById('btnLoad').onclick = ()=>{ state.races = Array.from({length:12},(_,i)=> demoRace(i+1)); state.activeRaceNo=1; renderMeeting(); };
+    document.getElementById('btnArchive').onclick = archiveToday;
+    document.getElementById('btnOpenHistory').onclick = ()=>{ renderHistory(); toggleDrawer(true); };
+    document.getElementById('raceDate').onchange = (e)=>{ state.raceDate = e.target.value; renderMeetingSummary(); };
+    document.getElementById('venue').onchange = (e)=>{ state.venue = e.target.value; renderMeetingSummary(); };
+  }
+}
+
+/****************************
+ * Menu 切換視圖
+ ****************************/
+el.menubar.addEventListener('click', (e)=>{
+  const btn = e.target.closest('.menu-btn'); if(!btn) return;
+  state.view = btn.dataset.view;
+  renderView();
+});
+function renderView(){
+  [...el.menubar.querySelectorAll('.menu-btn')].forEach(b=> b.setAttribute('aria-current', b.dataset.view===state.view? 'page': 'false'));
+  Object.entries(el.views).forEach(([k,v])=> v.classList.toggle('active', k===state.view));
+  renderControls();
+
+  if (state.view === 'meeting')  renderMeeting();
+  if (state.view === 'horses')   (async ()=>{ await fetchHorsesFromAPI(); renderHorses(); })();
+  if (state.view === 'jockeys')  renderJockeys();
+  if (state.view === 'trainers') renderTrainers();
+  if (state.view === 'stats')    renderStats();
+}
+
+
+/****************************
+ * Meeting renderers
+ ****************************/
+function renderMeeting(){ renderMeetingSummary(); renderRaceList(); renderPanels(); }
+function renderMeetingSummary(){ el.summary.textContent = `${state.raceDate}・${state.venue}・共 ${state.races.length} 場`; }
+function renderRaceList(){
+  el.raceList.innerHTML = '';
+  state.races.forEach(r=>{
+    const row = document.createElement('div');
+    row.className = 'race-item' + (r.no===state.activeRaceNo ? ' active': '');
+    row.innerHTML = `
+      <div>${r.no}</div>
+      <div>
+        <div><strong>${r.time}</strong>　<small>${r.course} ${r.distance}m</small></div>
+        <small class="muted">場地：${r.going}</small>
+      </div>
+      <div><span class="badge ${r.status==='開跑'?'live':''}">${r.status}</span></div>`;
+    row.addEventListener('click', ()=>{ state.activeRaceNo=r.no; renderRaceList(); renderPanels(); });
+    el.raceList.appendChild(row);
+  });
+}
+// tabs
+const panels = { basic: document.getElementById('panel-basic'), odds: document.getElementById('panel-odds'), runners: document.getElementById('panel-runners') };
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const t = e.target.closest('.tab'); if(!t) return; state.tab = t.dataset.tab; renderPanels();
+});
+function renderPanels(){
+  // tabs ui
+  [...document.getElementById('tabs').children].forEach(t=> t.classList.toggle('active', t.dataset.tab===state.tab));
+  Object.keys(panels).forEach(k=> panels[k].classList.toggle('active', k===state.tab));
+  if(state.tab==='basic') renderBasic();
+  if(state.tab==='odds') renderOdds();
+  if(state.tab==='runners') renderRunners();
+}
+function getActiveRace(){ return state.races.find(x=>x.no===state.activeRaceNo); }
+function renderBasic(){
+  const r = getActiveRace();
+  el.basicCards.innerHTML = `
+    <div class="card">
+      <h3 style="margin:.2rem 0 .6rem">第 ${r.no} 場　<small class="muted">${state.raceDate}・${state.venue}</small></h3>
+      <div class="kv">
+        <div class="muted">開跑時間</div><div>${r.time}</div>
+        <div class="muted">途程</div><div>${r.course} ${r.distance} m</div>
+        <div class="muted">場地</div><div>${r.going}</div>
+        <div class="muted">狀態</div><div>${r.status}</div>
+        <div class="muted">參賽數</div><div>${r.runners.length}</div>
+      </div>
+    </div>
+    <div class="card">
+      <h4 style="margin:.2rem 0 .4rem">備註</h4>
+      <p class="muted">（連接你的爬蟲後，可在此顯示賽事通告、抽籤、換騎、退賽等）</p>
+    </div>`;
+}
+function renderOdds(){
+  const r = getActiveRace();
+  el.oddsTableBody.innerHTML = r.runners.map(h=>`
+    <tr><td>${h.num}</td><td>${h.name_zh}</td><td>${h.win}</td><td>${h.pla}</td><td class="muted">${h.updated_at}</td></tr>`).join('');
+}
+function renderRunners(){
+  const r = getActiveRace();
+  el.runnersTableBody.innerHTML = r.runners.map(h=>`
+    <tr><td>${h.num}</td><td>${h.name_zh} <span class="muted">/ ${h.name_en}</span></td><td>${h.rating}</td><td>${h.jockey}</td><td>${h.trainer}</td><td>${h.draw}</td></tr>`).join('');
+}
+
+/****************************
+ * Horses / Jockeys / Trainers
+ ****************************/
+// 把 /api/horses 的資料轉成前端表格需要的格式
+async function fetchHorsesFromAPI() {
+  const sex = document.getElementById('sexFilter').value || '';
+  const min = Number(document.getElementById('ratingMin').value || 0);
+  const q   = (document.getElementById('qHorses').value || '').trim();
+
+  // 後端 app.py 已支援的參數：q / sex / rating_min / limit
+  const url = new URL(`${API_BASE}/api/horses`);
+  if (q) url.searchParams.set('q', q);
+  if (sex) url.searchParams.set('sex', sex);
+  if (min) url.searchParams.set('rating_min', String(min));
+  url.searchParams.set('limit', '200');
+
+  const res  = await fetch(url.toString());
+  const json = await res.json();
+  const rows = Array.isArray(json) ? json : (json.items || json.data || []);
+
+  // 從資料庫欄位映射到前端欄位
+  // 你目前的 DB 表是 horse_profiles（DESC 見到的欄位：horse_id, name, horse_code, sex, age, colour, country, trainer, owner, updated_at）
+  state.horses = rows.map(r => ({
+    code:   r.horse_code || r.horse_id || '',
+    name_zh: r.name || r.name_chi || '',    // 你表是 name，若日後有中英分開可再調整
+    name_en: r.name_eng || '',              // 後端未必有，沒有就留空
+    sex:    r.sex || '',
+    age:    r.age ?? '',
+    rating: r.current_rating ?? r.season_rating ?? '', // 若 horse_profiles 沒有評分，這欄會是空
+    trainer: r.trainer || r.trainer_id || '',
+    form:    r.last10_racedays || ''        // 你表沒有就會是空
+  }));
+}
+
+
+function renderHorses(){
+  const sex = document.getElementById('sexFilter').value || '';
+  const min = Number(document.getElementById('ratingMin').value||0);
+  const q = (document.getElementById('qHorses').value||'').toLowerCase();
+  const list = state.horses.filter(h=>
+    (!sex || h.sex===sex) && h.rating>=min &&
+    (h.name_zh.includes(q) || h.name_en.toLowerCase().includes(q) || h.code.toLowerCase().includes(q))
+  );
+  el.horsesTableBody.innerHTML = list.map(h=>`
+    <tr><td>${h.code}</td><td>${h.name_zh} <span class="muted">/ ${h.name_en}</span></td><td>${h.sex}</td><td>${h.age}</td><td>${h.rating}</td><td>${h.trainer}</td><td>${h.form}</td></tr>`).join('');
+  // stats quick update
+  document.getElementById('stat-horses') && (document.getElementById('stat-horses').textContent = state.horses.length);
+}
+['qHorses','sexFilter','ratingMin'].forEach(id=>{
+  document.addEventListener('input', async (e)=>{
+    if(e.target.id === id){
+      await fetchHorsesFromAPI();
+      renderHorses();
+    }
+  });
+});
+
+
+function renderJockeys(){
+  const claim = document.getElementById('claimFilter').value;
+  const q = (document.getElementById('qJockeys').value||'').toLowerCase();
+  const list = state.jockeys.filter(j=>
+    (!claim || (claim==='Y'? j.claim : !j.claim)) &&
+    (j.name.toLowerCase().includes(q))
+  );
+  el.jockeysTableBody.innerHTML = list.map(j=>{
+    const winRate = j.runs? ((j.win/j.runs)*100).toFixed(1)+'%' : '—';
+    return `<tr><td>${j.id}</td><td>${j.name}${j.claim? ' <span class="muted">(見習)</span>':''}</td><td>${j.runs}</td><td>${j.win}</td><td>${j.place2}</td><td>${j.place3}</td><td>${winRate}</td><td>${j.prize.toLocaleString()}</td></tr>`;
+  }).join('');
+  document.getElementById('stat-jockeys') && (document.getElementById('stat-jockeys').textContent = state.jockeys.length);
+}
+['qJockeys','claimFilter'].forEach(id=>{
+  document.addEventListener('input', (e)=>{ if(e.target.id===id) renderJockeys(); });
+});
+
+function renderTrainers(){
+  const q = (document.getElementById('qTrainers').value||'').toLowerCase();
+  const list = state.trainers.filter(t=> t.name.toLowerCase().includes(q));
+  el.trainersTableBody.innerHTML = list.map(t=>{
+    const winRate = t.runs? ((t.win/t.runs)*100).toFixed(1)+'%' : '—';
+    return `<tr><td>${t.id}</td><td>${t.name}</td><td>${t.runs}</td><td>${t.win}</td><td>${t.place2}</td><td>${t.place3}</td><td>${winRate}</td><td>${t.prize.toLocaleString()}</td></tr>`;
+  }).join('');
+  document.getElementById('stat-trainers') && (document.getElementById('stat-trainers').textContent = state.trainers.length);
+}
+['qTrainers'].forEach(id=>{ document.addEventListener('input',(e)=>{ if(e.target.id===id) renderTrainers(); }); });
+
+function renderStats(){ /* 數字在各自 render 時會順帶更新 */ }
+
+/****************************
+ * 歷史抽屜
+ ****************************/
+function toggleDrawer(open){ el.drawer.classList.toggle('open', open); }
+function renderHistory(){
+  const list = state.history; el.historyList.innerHTML = '';
+  if(!list.length){ el.historyList.innerHTML = `<div class="empty">尚未封存任何賽日。</div>`; return; }
+  list.slice().reverse().forEach(item=>{
+    const row = document.createElement('div'); row.className='history-item';
+    row.innerHTML = `
+      <div><strong>${item.raceDate}</strong>・<span class="muted">${item.venue}</span><div class="muted">共 ${item.races.length} 場</div></div>
+      <div><button class="btn" data-act="preview">查看</button><button class="btn danger" data-act="delete">刪除</button></div>`;
+    row.querySelector('[data-act="preview"]').onclick = ()=>{
+      state.view='meeting'; renderView();
+      state.raceDate=item.raceDate; state.venue=item.venue; state.races=item.races; state.activeRaceNo=1; renderMeeting(); toggleDrawer(false);
+    };
+    row.querySelector('[data-act="delete"]').onclick = ()=>{
+      const idx = state.history.findIndex(x=>x.id===item.id); if(idx>-1){ state.history.splice(idx,1); saveHistory(state.history); renderHistory(); }
+    };
+    el.historyList.appendChild(row);
+  });
+}
+function archiveToday(){
+  const snapshot = JSON.parse(JSON.stringify({ id: crypto.randomUUID(), raceDate: state.raceDate, venue: state.venue, races: state.races }));
+  state.history.push(snapshot); saveHistory(state.history); renderHistory(); toggleDrawer(true);
+}
+
+/****************************
+ * 初始化
+ ****************************/
+renderControls();
+renderView();
+</script>
+</body>
+</html>
