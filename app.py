@@ -11,6 +11,9 @@ from flask_cors import CORS
 import os
 import mysql.connector as mysql
 from mysql.connector import pooling
+from dotenv import load_dotenv
+load_dotenv()  # 讓程式啟動時自動讀取 .env
+
 
 # -----------------------------
 # App & Config
