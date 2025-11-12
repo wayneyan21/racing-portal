@@ -11,37 +11,43 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 dotenv.config();
 
 const app = express();
-const PUBLIC_DIR = path.join(__dirname, 'public');  // 固定 public 目錄
+const PUBLIC_DIR = path.join(__dirname, 'public'); // 固定 public 目錄
 
 // ---------- Middlewares ----------
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// （可加）請求日誌，方便 Render Logs 觀察
-app.use((req, _res, next) => { console.log('REQ', req.method, req.url); next(); });
+// 可選：請求日誌，方便 Render Logs 觀察
+app.use((req, _res, next) => {
+  console.log('REQ', req.method, req.url);
+  next();
+});
 
-// 1) 先掛 static
+// 1) 先掛 static（要在路由前）
 app.use(express.static(PUBLIC_DIR));
 
 // 2) 健康檢查（Render 用）
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用，避免吃掉你的 Node /api
+// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用，避免吃掉 Node 自己的 /api
 if (process.env.FLASK_URL) {
-  app.use('/flask', createProxyMiddleware({
-    target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render 內網 URL
-    changeOrigin: true,
-    pathRewrite: { '^/flask': '' }
-  }));
+  app.use(
+    '/flask',
+    createProxyMiddleware({
+      target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render 內網 URL
+      changeOrigin: true,
+      pathRewrite: { '^/flask': '' },
+    })
+  );
 }
 
-
+// 4) Session
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'change_this_super_secret_key',
     resave: false,
     saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 12 },
+    cookie: { maxAge: 1000 * 60 * 60 * 12 }, // 12 小時
   })
 );
 
@@ -62,6 +68,7 @@ let pool;
       user: process.env.DB_USER || 'root',
       password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'racing_db',
+      port: Number(process.env.DB_PORT || 3306),
       waitForConnections: true,
       connectionLimit: 10,
     });
@@ -71,36 +78,34 @@ let pool;
   }
 })();
 
+// ---------- Page routes ----------
 app.get('/', (req, res) => {
   // 未登入就去 /login；登入就去 /app
   if (req.session?.user) return res.redirect('/app');
   return res.redirect('/login');
 });
 
-app.get('/login', (req, res) => {
-  return res.sendFile(path.join(__dirnameResolved, 'public', 'login.html'));
+app.get('/login', (_req, res) => {
+  return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
-app.get('/app', requireAuth, (req, res) => {
-  return res.sendFile(path.join(__dirnameResolved, 'public', 'index.html'));
+app.post('/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (username !== USER.username) return res.status(401).send('Invalid credentials');
+  const ok = bcrypt.compareSync(password, USER.passwordHash);
+  if (!ok) return res.status(401).send('Invalid credentials');
+  req.session.user = { username };
+  res.redirect('/app');
 });
 
-// ---------- Page routes ----------
-//app.get('/', (req, res) => (req.session?.user ? res.redirect('/app') : res.redirect('/login')));
-//app.get('/login', (req, res) => res.sendFile(path.join(__dirnameResolved, 'public', 'login.html')));
-//app.post('/login', (req, res) => {
-  //const { username, password } = req.body || {};
-  //if (username !== USER.username) return res.status(401).send('Invalid credentials');
-  //const ok = bcrypt.compareSync(password, USER.passwordHash);
-  //if (!ok) return res.status(401).send('Invalid credentials');
-  //req.session.user = { username };
-  //res.redirect('/app');
-//});
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
-app.get('/app', requireAuth, (req, res) => res.sendFile(path.join(__dirnameResolved, 'public', 'index.html')));
+
+app.get('/app', requireAuth, (_req, res) => {
+  return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
 
 // ---------- API routes (protected) ----------
-app.get('/api/jockeys', requireAuth, async (req, res) => {
+app.get('/api/jockeys', requireAuth, async (_req, res) => {
   try {
     const [rows] = await pool.query(
       'SELECT name_zh AS jockey, country, starts, wins, place_pct FROM jockeys ORDER BY wins DESC LIMIT 500'
@@ -111,7 +116,7 @@ app.get('/api/jockeys', requireAuth, async (req, res) => {
   }
 });
 
-app.get('/api/trainers', requireAuth, async (req, res) => {
+app.get('/api/trainers', requireAuth, async (_req, res) => {
   try {
     const [rows] = await pool.query(
       'SELECT name_zh AS trainer, country, IFNULL(stable,"-") AS stable FROM trainers LIMIT 500'
@@ -122,15 +127,14 @@ app.get('/api/trainers', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 取得馬匹資料 ----------
 // 取得馬匹資料（最簡版）
-app.get('/api/horses', requireAuth, async (req, res) => {
+app.get('/api/horses', requireAuth, async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM horses LIMIT 200');
     console.log('Horses rows:', rows.length);
     res.json(rows);
   } catch (e) {
-    console.error("🐎 Horses API Error:", e);
+    console.error('🐎 Horses API Error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -142,7 +146,7 @@ app.get('/api/horses/search', requireAuth, async (req, res) => {
     if (!keyword) return res.json([]);
 
     const [rows] = await pool.query(
-      `SELECT horse_id, name_chi, name_eng, sex, age, colour, country, trainer_id, owner, 
+      `SELECT horse_id, name_chi, name_eng, sex, age, colour, country, trainer_id, owner,
               current_rating, season_rating, season_prize, total_prize, last10_racedays, updated_at
        FROM horses
        WHERE name_chi LIKE ? OR name_eng LIKE ?
@@ -153,12 +157,12 @@ app.get('/api/horses/search', requireAuth, async (req, res) => {
     console.log(`🔍 Search keyword: ${keyword}, found ${rows.length} horses`);
     res.json(rows);
   } catch (e) {
-    console.error("🐎 Horses Search API Error:", e);
+    console.error('🐎 Horses Search API Error:', e);
     res.status(500).json({ error: e.message });
   }
 });
 
-// 取得馬匹清單（支援關鍵字/分頁），供「多項修改」頁使用
+// 取得馬匹清單（支援關鍵字/分頁）
 app.get('/api/horses/list', requireAuth, async (req, res) => {
   try {
     const q = (req.query.q || '').trim();
@@ -188,7 +192,6 @@ app.get('/api/horses/list', requireAuth, async (req, res) => {
 // 批量更新（transaction）
 app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
   try {
-    // 可簡單限制只有 admin 可改
     if (req.session?.user?.username !== 'admin') {
       return res.status(403).json({ error: 'forbidden' });
     }
@@ -202,7 +205,6 @@ app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
 
       let updated = 0;
       for (const it of items) {
-        // 允許更新的欄位（白名單）
         const fields = [];
         const values = [];
 
@@ -233,9 +235,7 @@ app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
   }
 });
 
-
-
-app.get('/api/venues', requireAuth, async (req, res) => {
+app.get('/api/venues', requireAuth, async (_req, res) => {
   try {
     const [rows] = await pool.query('SELECT code, name_zh FROM venues ORDER BY code');
     res.json(rows);
@@ -266,9 +266,9 @@ app.get('/api/races/:no/runners', requireAuth, async (req, res) => {
 });
 
 // ---------- Debug ----------
-app.get('/debug/db', async (req, res) => {
+app.get('/debug/db', async (_req, res) => {
   try {
-    const [[db]]  = await pool.query('SELECT DATABASE() AS db');
+    const [[db]] = await pool.query('SELECT DATABASE() AS db');
     const [[cnt]] = await pool.query('SELECT COUNT(*) AS total FROM horses');
     res.json({ db: db.db, horses_count: cnt.total });
   } catch (e) {
@@ -276,19 +276,14 @@ app.get('/debug/db', async (req, res) => {
   }
 });
 
-// ---------- Static ----------
-app.use(express.static(path.join(__dirnameResolved, 'public')));
-
-// ---- 兜底：除 /api/* 之外嘅路徑，全部送去 login（或前端 index）----
+// ---- 兜底：除 /api/*、/flask/* 之外嘅路徑，全部送去 login（或前端 index）----
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api')) return next();
-  // 如果你想 SPA 式處理，可送 index.html；而家先兜底去 login.html
-  return res.sendFile(path.join(__dirnameResolved, 'public', 'login.html'));
+  if (req.path.startsWith('/api') || req.path.startsWith('/flask')) return next();
+  return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
-// ---------- Listen（重點：0.0.0.0 + Render PORT） ----------
+// ---------- Listen（0.0.0.0 + Render PORT） ----------
 const PORT = process.env.PORT || 3000;
-const HOST = '0.0.0.0';
-app.listen(PORT, HOST, () => {
-  console.log(`✅ Racing portal running on http://${HOST}:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Racing portal running on http://0.0.0.0:${PORT}`);
 });
