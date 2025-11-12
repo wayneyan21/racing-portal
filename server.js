@@ -8,7 +8,6 @@ const mysql = require('mysql2/promise');
 const dotenv = require('dotenv');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
-
 dotenv.config();
 
 const app = express();
@@ -17,12 +16,22 @@ const __dirnameResolved = __dirname;
 // ---------- Middlewares ----------
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
-// ---------- Proxy Flask API ----------
-app.use('/api', createProxyMiddleware({
-  target: 'http://127.0.0.1:5000',   // Flask 執行嘅 port（你改過5001就填5001）
-  changeOrigin: true,
-}));
 
+// ---------- Health check (Render 會 call 呢個) ----------
+app.get('/api/health', (req, res) => {
+  res.status(200).send('ok');
+});
+
+// ---------- （可選）Proxy Flask API ----------
+// 只喺有提供 FLASK_URL 時先 proxy，避免 Render 單服務搵唔到本機 5000
+// 亦避免影響 /api/health（改用 /flask 作 proxy 前綴）
+if (process.env.FLASK_URL) {
+  app.use('/flask', createProxyMiddleware({
+    target: process.env.FLASK_URL,      // 例：'http://127.0.0.1:5000'
+    changeOrigin: true,
+    pathRewrite: { '^/flask': '' },     // /flask/xxx -> /xxx
+  }));
+}
 
 app.use(
   session({
@@ -34,7 +43,6 @@ app.use(
 );
 
 // ---------- Demo user ----------
-// username: admin, password: Wayne123!
 const USER = { username: 'admin', passwordHash: bcrypt.hashSync('Wayne123!', 10) };
 
 function requireAuth(req, res, next) {
@@ -49,7 +57,7 @@ let pool;
     pool = await mysql.createPool({
       host: process.env.DB_HOST || '127.0.0.1',
       user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASS || '',
+      password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
       database: process.env.DB_NAME || 'racing_db',
       waitForConnections: true,
       connectionLimit: 10,
@@ -240,7 +248,7 @@ app.get('/api/races/:no/runners', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- 健檢：確認 DB 及 horses 行數 ----------
+// ---------- Debug ----------
 app.get('/debug/db', async (req, res) => {
   try {
     const [[db]]  = await pool.query('SELECT DATABASE() AS db');
@@ -251,9 +259,12 @@ app.get('/debug/db', async (req, res) => {
   }
 });
 
-
 // ---------- Static ----------
 app.use(express.static(path.join(__dirnameResolved, 'public')));
 
-const port = process.env.PORT || 3000;
-app.listen(port, () => console.log(`✅ Racing portal running on http://localhost:${port}`));
+// ---------- Listen（重點：0.0.0.0 + Render PORT） ----------
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`✅ Racing portal running on http://${HOST}:${PORT}`);
+});
