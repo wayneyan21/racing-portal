@@ -18,19 +18,16 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 // ---------- Health check (Render 會 call 呢個) ----------
-app.get('/api/health', (req, res) => {
-  res.status(200).send('ok');
-});
+app.get('/api/health', (req, res) => res.json({ ok: true }));
 
 // ---------- （可選）Proxy Flask API ----------
 // 只喺有提供 FLASK_URL 時先 proxy，避免 Render 單服務搵唔到本機 5000
 // 亦避免影響 /api/health（改用 /flask 作 proxy 前綴）
 if (process.env.FLASK_URL) {
-  app.use('/flask', createProxyMiddleware({
-    target: process.env.FLASK_URL,      // 例：'http://127.0.0.1:5000'
-    changeOrigin: true,
-    pathRewrite: { '^/flask': '' },     // /flask/xxx -> /xxx
-  }));
+  app.use('/api', createProxyMiddleware({
+  target: 'http://127.0.0.1:5000',
+  changeOrigin: true,
+}));
 }
 
 app.use(
@@ -68,17 +65,31 @@ let pool;
   }
 })();
 
-// ---------- Page routes ----------
-app.get('/', (req, res) => (req.session?.user ? res.redirect('/app') : res.redirect('/login')));
-app.get('/login', (req, res) => res.sendFile(path.join(__dirnameResolved, 'public', 'login.html')));
-app.post('/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (username !== USER.username) return res.status(401).send('Invalid credentials');
-  const ok = bcrypt.compareSync(password, USER.passwordHash);
-  if (!ok) return res.status(401).send('Invalid credentials');
-  req.session.user = { username };
-  res.redirect('/app');
+app.get('/', (req, res) => {
+  // 未登入就去 /login；登入就去 /app
+  if (req.session?.user) return res.redirect('/app');
+  return res.redirect('/login');
 });
+
+app.get('/login', (req, res) => {
+  return res.sendFile(path.join(__dirnameResolved, 'public', 'login.html'));
+});
+
+app.get('/app', requireAuth, (req, res) => {
+  return res.sendFile(path.join(__dirnameResolved, 'public', 'index.html'));
+});
+
+// ---------- Page routes ----------
+//app.get('/', (req, res) => (req.session?.user ? res.redirect('/app') : res.redirect('/login')));
+//app.get('/login', (req, res) => res.sendFile(path.join(__dirnameResolved, 'public', 'login.html')));
+//app.post('/login', (req, res) => {
+  //const { username, password } = req.body || {};
+  //if (username !== USER.username) return res.status(401).send('Invalid credentials');
+  //const ok = bcrypt.compareSync(password, USER.passwordHash);
+  //if (!ok) return res.status(401).send('Invalid credentials');
+  //req.session.user = { username };
+  //res.redirect('/app');
+//});
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 app.get('/app', requireAuth, (req, res) => res.sendFile(path.join(__dirnameResolved, 'public', 'index.html')));
 
@@ -261,6 +272,13 @@ app.get('/debug/db', async (req, res) => {
 
 // ---------- Static ----------
 app.use(express.static(path.join(__dirnameResolved, 'public')));
+
+// ---- 兜底：除 /api/* 之外嘅路徑，全部送去 login（或前端 index）----
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  // 如果你想 SPA 式處理，可送 index.html；而家先兜底去 login.html
+  return res.sendFile(path.join(__dirnameResolved, 'public', 'login.html'));
+});
 
 // ---------- Listen（重點：0.0.0.0 + Render PORT） ----------
 const PORT = process.env.PORT || 3000;
