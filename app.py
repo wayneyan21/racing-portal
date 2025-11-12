@@ -78,6 +78,40 @@ def execute_query(sql, params=None, dict_cursor=True, many=False):
         cur.close()
         conn.close()
 
+@app.get("/api/debug/pingdb")
+def debug_pingdb():
+    try:
+        r = execute_query("SELECT 1 AS ok;", ())
+        return {"ok": True, "db": r[0]["ok"] == 1}
+    except Exception as e:
+        app.logger.exception("pingdb failed")
+        return {"ok": False, "error": str(e)}, 500
+
+@app.get("/api/debug/desc-horses")
+def debug_desc_horses():
+    try:
+        r = execute_query("DESC horse_profiles;", ())
+        return jsonify(r)
+    except Exception as e:
+        app.logger.exception("desc failed")
+        return {"ok": False, "error": str(e)}, 500
+
+@app.get("/api/debug/sample-horses")
+def debug_sample_horses():
+    try:
+        # 先不用 DATE_FORMAT／參數，最精簡測試
+        r = execute_query("""
+            SELECT horse_id, name AS name_chi, horse_code, sex, colour, country, age, trainer AS trainer_id, owner, updated_at
+            FROM horse_profiles
+            ORDER BY updated_at DESC
+            LIMIT 5
+        """)
+        return jsonify(r)
+    except Exception as e:
+        app.logger.exception("sample failed")
+        return {"ok": False, "error": str(e)}, 500
+
+
 # -----------------------------
 # Health Check
 # -----------------------------
