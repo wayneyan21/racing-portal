@@ -11,24 +11,30 @@ const { createProxyMiddleware } = require('http-proxy-middleware');
 dotenv.config();
 
 const app = express();
-const __dirnameResolved = __dirname;
+const PUBLIC_DIR = path.join(__dirname, 'public');  // 固定 public 目錄
 
 // ---------- Middlewares ----------
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// ---------- Health check (Render 會 call 呢個) ----------
-app.get('/api/health', (req, res) => res.json({ ok: true }));
+// （可加）請求日誌，方便 Render Logs 觀察
+app.use((req, _res, next) => { console.log('REQ', req.method, req.url); next(); });
 
-// ---------- （可選）Proxy Flask API ----------
-// 只喺有提供 FLASK_URL 時先 proxy，避免 Render 單服務搵唔到本機 5000
-// 亦避免影響 /api/health（改用 /flask 作 proxy 前綴）
+// 1) 先掛 static
+app.use(express.static(PUBLIC_DIR));
+
+// 2) 健康檢查（Render 用）
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用，避免吃掉你的 Node /api
 if (process.env.FLASK_URL) {
-  app.use('/api', createProxyMiddleware({
-  target: 'http://127.0.0.1:5000',
-  changeOrigin: true,
-}));
+  app.use('/flask', createProxyMiddleware({
+    target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render 內網 URL
+    changeOrigin: true,
+    pathRewrite: { '^/flask': '' }
+  }));
 }
+
 
 app.use(
   session({
