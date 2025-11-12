@@ -1,229 +1,241 @@
-# -*- coding: utf-8 -*-
-"""
-Flask API — HKJC (RDS 版)
-- 讀取 .env 的 DB_HOST/DB_PORT/DB_USER/DB_PASS/DB_NAME
-- mysql.connector 直連（亦可切換連線池）
-- 統一查詢助手 execute_query()
-"""
+// server.js — clean consistent version
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const bodyParser = require('body-parser');
+const bcrypt = require('bcryptjs');
+const mysql = require('mysql2/promise');
+const dotenv = require('dotenv');
+const { createProxyMiddleware } = require('http-proxy-middleware');
 
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os
-import mysql.connector as mysql
-from mysql.connector import pooling
-from dotenv import load_dotenv
-import logging
-logging.basicConfig(level=logging.INFO)
+dotenv.config();
 
-load_dotenv()  # 讓程式啟動時自動讀取 .env
+const app = express();
+const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// ---------- Middlewares ----------
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-# -----------------------------
-# App & Config
-# -----------------------------
-app = Flask(__name__)
-app.config['JSON_AS_ASCII'] = False
-app.config['JSON_SORT_KEYS'] = False
-CORS(app)  # 上線後可改成 CORS(app, resources={r"/api/*": {"origins": ["https://你的網域"]}})
+// （可選）請求日誌，方便在 Render Logs 觀察
+app.use((req, _res, next) => {
+  console.log('REQ', req.method, req.url);
+  next();
+});
 
-# -----------------------------
-# DB 連線設定（環境變數）
-# -----------------------------
-DB_CFG = dict(
-    host=os.getenv("DB_HOST", "127.0.0.1"),
-    port=int(os.getenv("DB_PORT", "3306")),
-    user=os.getenv("DB_USER", "root"),
-    password=os.getenv("DB_PASS", ""),
-    database=os.getenv("DB_NAME", "hkjc_db"),
-    charset="utf8mb4",
-)
+// 1) 先掛 static
+app.use(express.static(PUBLIC_DIR));
 
-USE_POOL = True  # 想簡單點可改 False 用「每次新連線」
+// 2) 健康檢查（Render 用）
+app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-pool = None
-if USE_POOL:
-    pool = pooling.MySQLConnectionPool(
-        pool_name="hkjc_pool",
-        pool_size=5,
-        **DB_CFG
-    )
+// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用
+if (process.env.FLASK_URL) {
+  app.use('/flask', createProxyMiddleware({
+    target: process.env.FLASK_URL, // 例： http://127.0.0.1:5000
+    changeOrigin: true,
+    pathRewrite: { '^/flask': '' },
+  }));
+}
 
-def get_conn():
-    """取得一個 MySQL 連線。"""
-    if USE_POOL and pool is not None:
-        return pool.get_connection()
-    return mysql.connect(**DB_CFG)
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'change_this_super_secret_key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { maxAge: 1000 * 60 * 60 * 12 },
+}));
 
-def execute_query(sql, params=None, dict_cursor=True, many=False):
-    """
-    通用查詢助手：
-    - dict_cursor=True 會回傳 dict 列
-    - many=True 時，用 executemany
-    - 自動關閉連線
-    """
-    conn = get_conn()
-    try:
-        cur = conn.cursor(dictionary=dict_cursor)
-        if many:
-            cur.executemany(sql, params or [])
-        else:
-            cur.execute(sql, params or ())
-        if sql.strip().lower().startswith(("select", "show", "desc")):
-            rows = cur.fetchall()
-            return rows
-        else:
-            conn.commit()
-            return {"affected": cur.rowcount, "lastrowid": getattr(cur, "lastrowid", None)}
-    finally:
-        cur.close()
-        conn.close()
+// ---------- Demo user ----------
+const USER = { username: 'admin', passwordHash: bcrypt.hashSync('Wayne123!', 10) };
 
-@app.get("/api/debug/pingdb")
-def debug_pingdb():
-    try:
-        r = execute_query("SELECT 1 AS ok;", ())
-        return {"ok": True, "db": r[0]["ok"] == 1}
-    except Exception as e:
-        app.logger.exception("pingdb failed")
-        return {"ok": False, "error": str(e)}, 500
+function requireAuth(req, res, next) {
+  if (req.session && req.session.user) return next();
+  return res.redirect('/login');
+}
 
-@app.get("/api/debug/desc-horses")
-def debug_desc_horses():
-    try:
-        r = execute_query("DESC horse_profiles;", ())
-        return jsonify(r)
-    except Exception as e:
-        app.logger.exception("desc failed")
-        return {"ok": False, "error": str(e)}, 500
+// ---------- MySQL Pool ----------
+let pool;
+(async () => {
+  try {
+    pool = await mysql.createPool({
+      host: process.env.DB_HOST || '127.0.0.1',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'racing_db',
+      waitForConnections: true,
+      connectionLimit: 10,
+    });
+    console.log('✅ MySQL connected');
+  } catch (e) {
+    console.error('❌ MySQL connection failed:', e.message);
+  }
+})();
 
-@app.get("/api/debug/sample-horses")
-def debug_sample_horses():
-    try:
-        # 先不用 DATE_FORMAT／參數，最精簡測試
-        r = execute_query("""
-            SELECT horse_id, name AS name_chi, horse_code, sex, colour, country, age, trainer AS trainer_id, owner, updated_at
-            FROM horse_profiles
-            ORDER BY updated_at DESC
-            LIMIT 5
-        """)
-        return jsonify(r)
-    except Exception as e:
-        app.logger.exception("sample failed")
-        return {"ok": False, "error": str(e)}, 500
+// ---------- Page routes ----------
+app.get('/', (req, res) => {
+  if (req.session?.user) return res.redirect('/app');
+  return res.redirect('/login');
+});
 
+app.get('/login', (_req, res) => {
+  return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+});
 
-# -----------------------------
-# Health Check
-# -----------------------------
-@app.get("/api/health")
-def health():
-    try:
-        rows = execute_query("SELECT 1 AS ok;")
-        return {"ok": True, "db": rows[0]["ok"] == 1}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}, 500
+app.post('/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (username !== USER.username) return res.status(401).send('Invalid credentials');
+  const ok = bcrypt.compareSync(password, USER.passwordHash);
+  if (!ok) return res.status(401).send('Invalid credentials');
+  req.session.user = { username };
+  return res.redirect('/app');
+});
 
-@app.get("/api/debug/where-db")
-def debug_where_db():
-    try:
-        env_host = os.getenv("DB_HOST", "")
-        # 查 DB 自己報番來的資訊
-        rows = execute_query("""
-            SELECT
-              @@hostname           AS db_hostname,   -- 伺服器主機名
-              @@port               AS db_port,
-              @@version            AS mysql_version,
-              @@version_comment    AS mysql_flavor,
-              DATABASE()           AS current_schema,
-              CURRENT_USER()       AS current_user
-        """)
-        # 只有 RDS MySQL 先會有大量以 rds_ 開頭的變數
-        rds_vars = execute_query("""SHOW GLOBAL VARIABLES LIKE 'rds%';""")
-        is_rds = ('.rds.amazonaws.com' in (env_host or '').lower()) or (len(rds_vars) > 0)
+app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 
-        info = rows[0] if rows else {}
-        return {
-            "env_host": env_host,          # 你 .env 指向邊個 host
-            "db_info": info,               # DB 自己回報嘅實際運行環境
-            "rds_vars_count": len(rds_vars),
-            "is_rds": bool(is_rds)         # True=RDS, False=本機/其他
+app.get('/app', requireAuth, (_req, res) => {
+  return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
+// ---------- APIs (需登入) ----------
+app.get('/api/jockeys', requireAuth, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT name_zh AS jockey, country, starts, wins, place_pct FROM jockeys ORDER BY wins DESC LIMIT 500'
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/trainers', requireAuth, async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT name_zh AS trainer, country, IFNULL(stable,"-") AS stable FROM trainers LIMIT 500'
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/horses', requireAuth, async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM horses LIMIT 200');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/horses/search', requireAuth, async (req, res) => {
+  try {
+    const keyword = req.query.q?.trim();
+    if (!keyword) return res.json([]);
+    const [rows] = await pool.query(
+      `SELECT horse_id, name_chi, name_eng, sex, age, colour, country, trainer_id, owner,
+              current_rating, season_rating, season_prize, total_prize, last10_racedays, updated_at
+       FROM horses
+       WHERE name_chi LIKE ? OR name_eng LIKE ?
+       ORDER BY updated_at DESC LIMIT 200`,
+      [`%${keyword}%`, `%${keyword}%`]
+    );
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/api/horses/list', requireAuth, async (req, res) => {
+  try {
+    const q = (req.query.q || '').trim();
+    const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
+    const offset = Math.max(parseInt(req.query.offset || '0', 10), 0);
+    let sql = `
+      SELECT horse_id, name_chi, name_eng, sex, age, colour, country,
+             trainer_id, owner, current_rating, season_rating, updated_at
+      FROM horses`;
+    const params = [];
+    if (q) {
+      sql += ` WHERE name_chi LIKE ? OR name_eng LIKE ? OR horse_id LIKE ? `;
+      params.push(`%${q}%`, `%${q}%`, `%${q}%`);
+    }
+    sql += ` ORDER BY updated_at DESC LIMIT ? OFFSET ? `;
+    params.push(limit, offset);
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
+  try {
+    if (req.session?.user?.username !== 'admin') {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!items.length) return res.json({ updated: 0 });
+
+    const conn = await pool.getConnection();
+    try {
+      await conn.beginTransaction();
+      let updated = 0;
+      for (const it of items) {
+        const fields = [], values = [];
+        if (typeof it.owner === 'string') { fields.push('owner=?'); values.push(it.owner); }
+        if (typeof it.trainer_id === 'string') { fields.push('trainer_id=?'); values.push(it.trainer_id); }
+        if (it.current_rating !== undefined && it.current_rating !== null) {
+          fields.push('current_rating=?'); values.push(parseInt(it.current_rating, 10) || 0);
         }
-    except Exception as e:
-        return {"ok": False, "error": str(e)}, 500
+        if (!fields.length || !it.horse_id) continue;
+        const sql = `UPDATE horses SET ${fields.join(', ')}, updated_at=NOW() WHERE horse_id=?`;
+        values.push(it.horse_id);
+        const [ret] = await conn.query(sql, values);
+        updated += ret.affectedRows;
+      }
+      await conn.commit();
+      conn.release();
+      res.json({ updated });
+    } catch (e) {
+      await conn.rollback(); conn.release(); throw e;
+    }
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
+app.get('/api/venues', requireAuth, async (_req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT code, name_zh FROM venues ORDER BY code');
+    res.json(rows);
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-# -----------------------------
-# Horses
-# -----------------------------
-@app.get("/api/horses")
-def list_horses():
-    try:
-        q      = (request.args.get("q") or "").strip()
-        sex    = (request.args.get("sex") or "").strip()
-        limit  = max(1, min(request.args.get("limit", type=int, default=200), 500))
-        offset = max(0, request.args.get("offset", type=int, default=0))
+app.get('/api/races/:no/runners', requireAuth, async (req, res) => {
+  try {
+    const raceNo = Number(req.params.no);
+    if (raceNo < 1 || raceNo > 12) return res.status(400).json({ error: 'race no 1..12' });
+    const [races] = await pool.query(
+      'SELECT id, race_day, venue_code, distance_m, going FROM races WHERE race_day=CURDATE() AND race_no=? LIMIT 1',
+      [raceNo]
+    );
+    if (!races.length) return res.json({ meta: null, items: [] });
+    const race = races[0];
+    const [rows] = await pool.query(
+      'SELECT saddle_no, horse_name_zh, jockey_zh, weight_lbs, draw, sp FROM race_runners WHERE race_id=? ORDER BY saddle_no',
+      [race.id]
+    );
+    res.json({ meta: race, items: rows });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-        sql = """
-            SELECT
-                horse_id,
-                name                AS name_chi,
-                horse_code,
-                sex,
-                colour,
-                country,
-                age,
-                trainer             AS trainer_id,
-                owner,
-                DATE_FORMAT(updated_at, '%%Y-%%m-%%d %%H:%%i:%%s') AS updated_at
-            FROM horse_profiles
-            WHERE 1=1
-        """
-        params = []
-        if sex:
-            sql += " AND sex = %s"
-            params.append(sex)
-        if q:
-            like = f"%{q}%"
-            sql += " AND (name LIKE %s OR horse_id LIKE %s OR horse_code LIKE %s OR owner LIKE %s)"
-            params += [like, like, like, like]
-        sql += " ORDER BY updated_at DESC, horse_id LIMIT %s OFFSET %s"
-        params += [limit, offset]
+// ---------- Debug（可不用登入，方便檢查 DB） ----------
+app.get('/debug/db', async (_req, res) => {
+  try {
+    const [[db]]  = await pool.query('SELECT DATABASE() AS db');
+    const [[cnt]] = await pool.query('SELECT COUNT(*) AS total FROM horses');
+    res.json({ db: db.db, horses_count: cnt.total });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
-        rows = execute_query(sql, tuple(params), dict_cursor=True)
-        return jsonify(rows)
-    except Exception as e:
-        app.logger.exception("list_horses failed")
-        return jsonify({"error": "server", "detail": str(e)}), 500
+// ---- 兜底：非 /api/* 一律回 login.html（或可改為 SPA 的 index.html）----
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
+});
 
-
-@app.get("/api/horses/<horse_id>")
-def horse_detail(horse_id):
-    rows = execute_query("SELECT * FROM horse_profiles WHERE horse_id=%s", (horse_id,), dict_cursor=True)
-    if not rows:
-        return jsonify({"error": "not_found"}), 404
-    return jsonify(rows[0])
-
-# -----------------------------
-# 啟動前自測
-# -----------------------------
-def test_db_connection():
-    try:
-        rows = execute_query("SELECT COUNT(*) AS c FROM horse_profiles;")
-        total = rows[0]["c"]
-        print(f"✅ DB 連線 OK，horse_profiles = {total}")
-    except Exception as e:
-        print("❌ DB 連線失敗：", e)
-
-# -----------------------------
-# 全域錯誤處理（可選）
-# -----------------------------
-@app.errorhandler(500)
-def handle_500(err):
-    return jsonify({"error": "internal_error", "detail": str(err)}), 500
-
-# -----------------------------
-# Main
-# -----------------------------
-if __name__ == "__main__":
-    test_db_connection()
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
+// ---------- Listen ----------
+const PORT = process.env.PORT || 3000;
+const HOST = '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`✅ Racing portal running on http://${HOST}:${PORT}`);
+});
