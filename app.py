@@ -123,6 +123,35 @@ def health():
     except Exception as e:
         return {"ok": False, "error": str(e)}, 500
 
+@app.get("/api/debug/where-db")
+def debug_where_db():
+    try:
+        env_host = os.getenv("DB_HOST", "")
+        # 查 DB 自己報番來的資訊
+        rows = execute_query("""
+            SELECT
+              @@hostname           AS db_hostname,   -- 伺服器主機名
+              @@port               AS db_port,
+              @@version            AS mysql_version,
+              @@version_comment    AS mysql_flavor,
+              DATABASE()           AS current_schema,
+              CURRENT_USER()       AS current_user
+        """)
+        # 只有 RDS MySQL 先會有大量以 rds_ 開頭的變數
+        rds_vars = execute_query("""SHOW GLOBAL VARIABLES LIKE 'rds%';""")
+        is_rds = ('.rds.amazonaws.com' in (env_host or '').lower()) or (len(rds_vars) > 0)
+
+        info = rows[0] if rows else {}
+        return {
+            "env_host": env_host,          # 你 .env 指向邊個 host
+            "db_info": info,               # DB 自己回報嘅實際運行環境
+            "rds_vars_count": len(rds_vars),
+            "is_rds": bool(is_rds)         # True=RDS, False=本機/其他
+        }
+    except Exception as e:
+        return {"ok": False, "error": str(e)}, 500
+
+
 # -----------------------------
 # Horses
 # -----------------------------
