@@ -12,6 +12,9 @@ import os
 import mysql.connector as mysql
 from mysql.connector import pooling
 from dotenv import load_dotenv
+import logging
+logging.basicConfig(level=logging.INFO)
+
 load_dotenv()  # 讓程式啟動時自動讀取 .env
 
 
@@ -91,42 +94,44 @@ def health():
 # -----------------------------
 @app.get("/api/horses")
 def list_horses():
-    q      = (request.args.get("q") or "").strip()
-    sex    = (request.args.get("sex") or "").strip()
-    limit  = max(1, min(request.args.get("limit", type=int, default=200), 500))
-    offset = max(0, request.args.get("offset", type=int, default=0))
+    try:
+        q      = (request.args.get("q") or "").strip()
+        sex    = (request.args.get("sex") or "").strip()
+        limit  = max(1, min(request.args.get("limit", type=int, default=200), 500))
+        offset = max(0, request.args.get("offset", type=int, default=0))
 
-    sql = """
-        SELECT
-            horse_id,
-            name                AS name_chi,
-            horse_code,
-            sex,
-            colour,
-            country,
-            age,
-            trainer             AS trainer_id,
-            owner,
-            DATE_FORMAT(updated_at, '%%Y-%%m-%%d %%H:%%i:%%s') AS updated_at
-        FROM horse_profiles
-        WHERE 1=1
-    """
-    params = []
+        sql = """
+            SELECT
+                horse_id,
+                name                AS name_chi,
+                horse_code,
+                sex,
+                colour,
+                country,
+                age,
+                trainer             AS trainer_id,
+                owner,
+                DATE_FORMAT(updated_at, '%%Y-%%m-%%d %%H:%%i:%%s') AS updated_at
+            FROM horse_profiles
+            WHERE 1=1
+        """
+        params = []
+        if sex:
+            sql += " AND sex = %s"
+            params.append(sex)
+        if q:
+            like = f"%{q}%"
+            sql += " AND (name LIKE %s OR horse_id LIKE %s OR horse_code LIKE %s OR owner LIKE %s)"
+            params += [like, like, like, like]
+        sql += " ORDER BY updated_at DESC, horse_id LIMIT %s OFFSET %s"
+        params += [limit, offset]
 
-    if sex:
-        sql += " AND sex = %s"
-        params.append(sex)
+        rows = execute_query(sql, tuple(params), dict_cursor=True)
+        return jsonify(rows)
+    except Exception as e:
+        app.logger.exception("list_horses failed")
+        return jsonify({"error": "server", "detail": str(e)}), 500
 
-    if q:
-        like = f"%{q}%"
-        sql += " AND (name LIKE %s OR horse_id LIKE %s OR horse_code LIKE %s OR owner LIKE %s)"
-        params += [like, like, like, like]
-
-    sql += " ORDER BY updated_at DESC, horse_id LIMIT %s OFFSET %s"
-    params += [limit, offset]
-
-    rows = execute_query(sql, tuple(params), dict_cursor=True)
-    return jsonify(rows)
 
 @app.get("/api/horses/<horse_id>")
 def horse_detail(horse_id):
