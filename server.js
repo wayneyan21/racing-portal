@@ -17,14 +17,30 @@ const PUBLIC_DIR = path.join(__dirname, 'public'); // 固定 public 目錄
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// 可選：請求日誌，方便 Render Logs 觀察
+// （可選）請求日誌
 app.use((req, _res, next) => {
   console.log('REQ', req.method, req.url);
   next();
 });
 
-// 1) 先掛 static（要在路由前）
+// ---------- Flask Proxy（你應該加喺呢度） ----------
+const { createProxyMiddleware } = require('http-proxy-middleware');
+
+if (process.env.FLASK_URL) {
+  console.log("🔗 Proxy to Flask API:", process.env.FLASK_URL);
+  app.use(
+    '/flask',      // 前端叫 /flask/xxx => Flask /xxx
+    createProxyMiddleware({
+      target: process.env.FLASK_URL,
+      changeOrigin: true,
+      pathRewrite: { '^/flask': '' }
+    })
+  );
+}
+
+// ---------- Static files ----------
 app.use(express.static(PUBLIC_DIR));
+
 
 // 2) 健康檢查（Render 用）
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
