@@ -23,34 +23,19 @@ app.use((req, _res, next) => {
   next();
 });
 
-// ---------- Flask Proxy（你應該加喺呢度） ----------
-const { createProxyMiddleware } = require('http-proxy-middleware');
-
-if (process.env.FLASK_URL) {
-  console.log("🔗 Proxy to Flask API:", process.env.FLASK_URL);
-  app.use(
-    '/flask',      // 前端叫 /flask/xxx => Flask /xxx
-    createProxyMiddleware({
-      target: process.env.FLASK_URL,
-      changeOrigin: true,
-      pathRewrite: { '^/flask': '' }
-    })
-  );
-}
-
-// ---------- Static files ----------
+// ---------- 靜態檔案 ----------
 app.use(express.static(PUBLIC_DIR));
-
 
 // 2) 健康檢查（Render 用）
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用，避免吃掉 Node 自己的 /api
+// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用
 if (process.env.FLASK_URL) {
+  console.log('🔗 Proxy to Flask API:', process.env.FLASK_URL);
   app.use(
-    '/flask',
+    '/flask',          // 前端叫 /flask/xxx => Flask 收到 /xxx
     createProxyMiddleware({
-      target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render 內網 URL
+      target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render URL
       changeOrigin: true,
       pathRewrite: { '^/flask': '' },
     })
