@@ -53,13 +53,48 @@ app.use(
 );
 
 // ---------- Demo user ----------
-app.post('/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (username !== USER.username) return res.status(401).send('Invalid credentials');
-  const ok = bcrypt.compareSync(password, USER.passwordHash);
-  if (!ok) return res.status(401).send('Invalid credentials');
-  req.session.user = { username };
-  res.redirect('/app');
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    // 查 DB
+    const [rows] = await db.execute(
+      'SELECT * FROM users WHERE username = ? LIMIT 1',
+      [username]
+    );
+
+    if (rows.length === 0) {
+      return res.send(`
+        <script>alert("用戶不存在"); window.location="/login";</script>
+      `);
+    }
+
+    const user = rows[0];
+
+    // bcrypt 比對 password
+    const ok = await bcrypt.compare(password, user.password_hash);
+
+    if (!ok) {
+      return res.send(`
+        <script>alert("密碼錯誤"); window.location="/login";</script>
+      `);
+    }
+
+    // Login 成功 → 寫 Session
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    };
+
+    console.log("Login success:", user.username);
+
+    return res.redirect('/app');
+
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).send('Internal Server Error (login)');
+  }
 });
 
 
