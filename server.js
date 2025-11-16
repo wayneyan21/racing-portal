@@ -53,7 +53,15 @@ app.use(
 );
 
 // ---------- Demo user ----------
-const USER = { username: 'admin', passwordHash: bcrypt.hashSync('Wayne123!', 10) };
+app.post('/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (username !== USER.username) return res.status(401).send('Invalid credentials');
+  const ok = bcrypt.compareSync(password, USER.passwordHash);
+  if (!ok) return res.status(401).send('Invalid credentials');
+  req.session.user = { username };
+  res.redirect('/app');
+});
+
 
 function requireAuth(req, res, next) {
   if (req.session && req.session.user) return next();
@@ -90,14 +98,54 @@ app.get('/login', (_req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
-app.post('/login', (req, res) => {
-  const { username, password } = req.body || {};
-  if (username !== USER.username) return res.status(401).send('Invalid credentials');
-  const ok = bcrypt.compareSync(password, USER.passwordHash);
-  if (!ok) return res.status(401).send('Invalid credentials');
-  req.session.user = { username };
-  res.redirect('/app');
+app.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body || {};
+    if (!username || !password) {
+      return res.status(400).send('Missing username or password');
+    }
+
+    // 1) 用 username 搵 user
+    const [rows] = await pool.query(
+      'SELECT id, username, password_hash, role, is_active FROM users WHERE username = ? LIMIT 1',
+      [username]
+    );
+
+    if (!rows.length) {
+      return res.status(401).send('Invalid credentials');
+    }
+
+    const user = rows[0];
+
+    // 2) 帳戶停用
+    if (!user.is_active) {
+      return res.status(403).send('Account disabled');
+    }
+
+    // 3) bcrypt 比對密碼
+    const ok = bcrypt.compareSync(password, user.password_hash);
+    if (!ok) {
+      return res.status(401).send('Invalid credentials');
+    }
+
+    // 4) 更新最後登入時間（唔成功都唔影響 login）
+    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id])
+      .catch(() => {});
+
+    // 5) 寫入 session
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      role: user.role,
+    };
+
+    res.redirect('/app');
+  } catch (e) {
+    console.error('Login error:', e);
+    res.status(500).send('Server error');
+  }
 });
+
 
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 

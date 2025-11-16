@@ -165,27 +165,25 @@ def debug_sample_horses():
 
 @app.get("/api/debug/where-db")
 def debug_where_db():
-    """
-    辨識目前實際連線係 AWS RDS 定 local：
-    - env_host：.env 設定嘅 host
-    - db_info：DB 自己回報 hostname / port / version
-    - is_rds：True 通常代表 RDS
-    """
+    """辨識目前連線目標是否 RDS、實際 DB 端資訊（兼容 AWS RDS）"""
     try:
         env_host = DB_CFG["host"]
+
         info = execute_query(
-            """
-            SELECT @@hostname         AS db_hostname,
-                   @@port             AS db_port,
-                   @@version          AS mysql_version,
-                   @@version_comment  AS mysql_flavor,
-                   DATABASE()         AS current_schema,
-                   CURRENT_USER()     AS current_user;
-        """
+            """SELECT @@hostname AS db_hostname,
+                      @@port AS db_port,
+                      @@version AS mysql_version,
+                      DATABASE() AS current_schema;"""
         )[0]
 
-        rds_vars = execute_query("SHOW GLOBAL VARIABLES LIKE 'rds%';")
-        is_rds = (".rds.amazonaws.com" in str(env_host).lower()) or bool(rds_vars)
+        try:
+            rds_vars = execute_query("SHOW VARIABLES LIKE 'rds%';")
+        except Exception:
+            rds_vars = []
+
+        is_rds = (
+            ".rds.amazonaws.com" in env_host.lower() or len(rds_vars) > 0
+        )
 
         return {
             "env_host": env_host,
@@ -193,8 +191,8 @@ def debug_where_db():
             "rds_vars_count": len(rds_vars),
             "is_rds": is_rds,
         }
+
     except Exception as e:
-        app.logger.exception("where-db failed")
         return {"ok": False, "error": str(e)}, 500
 
 
@@ -217,7 +215,7 @@ def list_horses():
                     sex, colour, country, age,
                     trainer             AS trainer_id,
                     owner,
-                    updated_at          AS updated_at  -- 直接用 DB 原本欄位
+                    updated_at          AS updated_at
             FROM    horse_profiles
             WHERE   1=1
         """
