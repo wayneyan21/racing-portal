@@ -128,55 +128,70 @@ app.get('/login', (_req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
-// ✅ 唯一一個 /login POST（用 DB users table）
+// ✅ Login（唯一一個 /login POST）
 app.post('/login', async (req, res) => {
-  if (!pool) return res.status(503).json({ error: 'DB not ready' });
   try {
-    if (!pool) {
-      console.error('DB pool not ready');
-      return res.status(503).send('Database not ready');
-    }
-
     const { username, password } = req.body || {};
+    console.log('[LOGIN] body =', req.body);
+
+    // 1) 基本檢查
     if (!username || !password) {
       return res.status(400).send('Missing username or password');
     }
 
+    // 2) DB pool 準備好未
+    if (!pool) {
+      console.error('[LOGIN] pool not ready');
+      return res.status(503).send('DB not ready');
+    }
+
+    // 3) 喺 DB 搵 user
     const [rows] = await pool.query(
       'SELECT id, username, password_hash, role, is_active FROM users WHERE username = ? LIMIT 1',
       [username]
     );
+    console.log('[LOGIN] rows =', rows);
 
     if (!rows.length) {
+      // 用戶名錯
       return res.status(401).send('Invalid credentials');
     }
 
     const user = rows[0];
 
+    // 4) 帳戶停用
     if (!user.is_active) {
       return res.status(403).send('Account disabled');
     }
 
-    const ok = bcrypt.compareSync(password, user.password_hash);
+    // 5) 用 bcrypt 對比密碼
+    const ok = await bcrypt.compare(password, user.password_hash);
+    console.log('[LOGIN] password ok?', ok);
+
     if (!ok) {
+      // 密碼錯
       return res.status(401).send('Invalid credentials');
     }
 
-    // 更新最後登入時間（錯咗都唔影響 login）
-    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [users.id]).catch(() => {});
-
+    // 6) 寫入 session
     req.session.user = {
-      id: users.id,
-      username: users.username,
-      role: users.role,
+      id: user.id,
+      username: user.username,
+      role: user.role,
     };
 
-    res.redirect('/app');
-  } catch (e) {
-    console.error('Login error:', e);
-    res.status(500).send('Server error');
+    // 7) 更新最後登入時間（就算失敗都唔影響 login）
+    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id])
+      .catch(err => console.error('[LOGIN] update last_login_at error', err));
+
+    // 8) Login OK → 去 /app
+    return res.redirect('/app');
+  } catch (err) {
+    console.error('[LOGIN] error', err);
+    return res.status(500).send('Server error (login)');
   }
 });
+
 
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 
