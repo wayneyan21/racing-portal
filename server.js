@@ -17,7 +17,6 @@ const PUBLIC_DIR = path.join(__dirname, 'public'); // 固定 public 目錄
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
-// （可選）請求日誌
 app.use((req, _res, next) => {
   console.log('REQ', req.method, req.url);
   next();
@@ -26,23 +25,23 @@ app.use((req, _res, next) => {
 // ---------- 靜態檔案 ----------
 app.use(express.static(PUBLIC_DIR));
 
-// 2) 健康檢查（Render 用）
+// 健康檢查（Render 用）
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
-// 3) （可選）Flask proxy：只有設定了 FLASK_URL 才啟用
+// Flask proxy
 if (process.env.FLASK_URL) {
   console.log('🔗 Proxy to Flask API:', process.env.FLASK_URL);
   app.use(
-    '/flask',          // 前端叫 /flask/xxx => Flask 收到 /xxx
+    '/flask',
     createProxyMiddleware({
-      target: process.env.FLASK_URL, // 例如 http://127.0.0.1:5000 或另一個 Render URL
+      target: process.env.FLASK_URL,
       changeOrigin: true,
       pathRewrite: { '^/flask': '' },
     })
   );
 }
 
-// 4) Session
+// Session
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'change_this_super_secret_key',
@@ -51,52 +50,6 @@ app.use(
     cookie: { maxAge: 1000 * 60 * 60 * 12 }, // 12 小時
   })
 );
-
-// ---------- Demo user ----------
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-
-  try {
-    // 查 DB
-    const [rows] = await db.execute(
-      'SELECT * FROM users WHERE username = ? LIMIT 1',
-      [username]
-    );
-
-    if (rows.length === 0) {
-      return res.send(`
-        <script>alert("用戶不存在"); window.location="/login";</script>
-      `);
-    }
-
-    const user = rows[0];
-
-    // bcrypt 比對 password
-    const ok = await bcrypt.compare(password, user.password_hash);
-
-    if (!ok) {
-      return res.send(`
-        <script>alert("密碼錯誤"); window.location="/login";</script>
-      `);
-    }
-
-    // Login 成功 → 寫 Session
-    req.session.user = {
-      id: user.id,
-      username: user.username,
-      role: user.role
-    };
-
-    console.log("Login success:", user.username);
-
-    return res.redirect('/app');
-
-  } catch (err) {
-    console.error("Login error:", err);
-    res.status(500).send('Internal Server Error (login)');
-  }
-});
-
 
 function requireAuth(req, res, next) {
   if (req.session && req.session.user) return next();
@@ -124,7 +77,6 @@ let pool;
 
 // ---------- Page routes ----------
 app.get('/', (req, res) => {
-  // 未登入就去 /login；登入就去 /app
   if (req.session?.user) return res.redirect('/app');
   return res.redirect('/login');
 });
@@ -133,6 +85,7 @@ app.get('/login', (_req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, 'login.html'));
 });
 
+// ✅ 唯一一個 /login POST（用 DB users table）
 app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body || {};
@@ -140,7 +93,6 @@ app.post('/login', async (req, res) => {
       return res.status(400).send('Missing username or password');
     }
 
-    // 1) 用 username 搵 user
     const [rows] = await pool.query(
       'SELECT id, username, password_hash, role, is_active FROM users WHERE username = ? LIMIT 1',
       [username]
@@ -152,22 +104,18 @@ app.post('/login', async (req, res) => {
 
     const user = rows[0];
 
-    // 2) 帳戶停用
     if (!user.is_active) {
       return res.status(403).send('Account disabled');
     }
 
-    // 3) bcrypt 比對密碼
     const ok = bcrypt.compareSync(password, user.password_hash);
     if (!ok) {
       return res.status(401).send('Invalid credentials');
     }
 
-    // 4) 更新最後登入時間（唔成功都唔影響 login）
-    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id])
-      .catch(() => {});
+    // 更新最後登入時間（錯咗都唔影響 login）
+    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]).catch(() => {});
 
-    // 5) 寫入 session
     req.session.user = {
       id: user.id,
       username: user.username,
@@ -181,12 +129,14 @@ app.post('/login', async (req, res) => {
   }
 });
 
-
 app.post('/logout', (req, res) => req.session.destroy(() => res.redirect('/login')));
 
 app.get('/app', requireAuth, (_req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
+
+// ...（你後面啲 /api/* routes 可以照保留）
+
 
 // ---------- API routes (protected) ----------
 app.get('/api/jockeys', requireAuth, async (_req, res) => {
