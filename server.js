@@ -88,6 +88,11 @@ app.get('/login', (_req, res) => {
 // ✅ 唯一一個 /login POST（用 DB users table）
 app.post('/login', async (req, res) => {
   try {
+    if (!pool) {
+      console.error('DB pool not ready');
+      return res.status(503).send('Database not ready');
+    }
+
     const { username, password } = req.body || {};
     if (!username || !password) {
       return res.status(400).send('Missing username or password');
