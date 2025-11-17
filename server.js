@@ -120,12 +120,12 @@ app.post('/login', async (req, res) => {
     }
 
     // 更新最後登入時間（錯咗都唔影響 login）
-    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]).catch(() => {});
+    pool.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [users.id]).catch(() => {});
 
     req.session.user = {
-      id: user.id,
-      username: user.username,
-      role: user.role,
+      id: users.id,
+      username: users.username,
+      role: users.role,
     };
 
     res.redirect('/app');
@@ -175,7 +175,7 @@ app.get('/api/trainers', requireAuth, async (_req, res) => {
 app.get('/api/horses', requireAuth, async (_req, res) => {
   if (!pool) return res.status(503).json({ error: 'DB not ready' });
   try {
-    const [rows] = await pool.query('SELECT * FROM horses LIMIT 200');
+    const [rows] = await pool.query('SELECT * FROM horse_profiles LIMIT 200');
     console.log('Horses rows:', rows.length);
     res.json(rows);
   } catch (e) {
@@ -263,7 +263,7 @@ app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
         }
         if (!fields.length || !it.horse_id) continue;
 
-        const sql = `UPDATE horses SET ${fields.join(', ')}, updated_at=NOW() WHERE horse_id=?`;
+        const sql = `UPDATE horse_profiles SET ${fields.join(', ')}, updated_at=NOW() WHERE horse_id=?`;
         values.push(it.horse_id);
         const [ret] = await conn.query(sql, values);
         updated += ret.affectedRows;
