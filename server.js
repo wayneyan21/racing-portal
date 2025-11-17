@@ -87,6 +87,7 @@ app.get('/login', (_req, res) => {
 
 // ✅ 唯一一個 /login POST（用 DB users table）
 app.post('/login', async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
   try {
     if (!pool) {
       console.error('DB pool not ready');
@@ -145,6 +146,8 @@ app.get('/app', requireAuth, (_req, res) => {
 
 // ---------- API routes (protected) ----------
 app.get('/api/jockeys', requireAuth, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const [rows] = await pool.query(
       'SELECT name_zh AS jockey, country, starts, wins, place_pct FROM jockeys ORDER BY wins DESC LIMIT 500'
@@ -156,6 +159,8 @@ app.get('/api/jockeys', requireAuth, async (_req, res) => {
 });
 
 app.get('/api/trainers', requireAuth, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const [rows] = await pool.query(
       'SELECT name_zh AS trainer, country, IFNULL(stable,"-") AS stable FROM trainers LIMIT 500'
@@ -168,6 +173,7 @@ app.get('/api/trainers', requireAuth, async (_req, res) => {
 
 // 取得馬匹資料（最簡版）
 app.get('/api/horses', requireAuth, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
   try {
     const [rows] = await pool.query('SELECT * FROM horses LIMIT 200');
     console.log('Horses rows:', rows.length);
@@ -180,6 +186,7 @@ app.get('/api/horses', requireAuth, async (_req, res) => {
 
 // 🔍 搜尋馬匹（支援中英文）
 app.get('/api/horses/search', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
   try {
     const keyword = req.query.q?.trim();
     if (!keyword) return res.json([]);
@@ -203,6 +210,8 @@ app.get('/api/horses/search', requireAuth, async (req, res) => {
 
 // 取得馬匹清單（支援關鍵字/分頁）
 app.get('/api/horses/list', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const q = (req.query.q || '').trim();
     const limit = Math.min(parseInt(req.query.limit || '50', 10), 200);
@@ -275,6 +284,8 @@ app.post('/api/horses/bulk-update', requireAuth, async (req, res) => {
 });
 
 app.get('/api/venues', requireAuth, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const [rows] = await pool.query('SELECT code, name_zh FROM venues ORDER BY code');
     res.json(rows);
@@ -285,6 +296,8 @@ app.get('/api/venues', requireAuth, async (_req, res) => {
 
 // Races 1–12 (today) runners
 app.get('/api/races/:no/runners', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const raceNo = Number(req.params.no);
     if (raceNo < 1 || raceNo > 12) return res.status(400).json({ error: 'race no 1..12' });
@@ -306,6 +319,8 @@ app.get('/api/races/:no/runners', requireAuth, async (req, res) => {
 
 // ---------- Debug ----------
 app.get('/debug/db', async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
   try {
     const [[db]] = await pool.query('SELECT DATABASE() AS db');
     const [[cnt]] = await pool.query('SELECT COUNT(*) AS total FROM horses');
