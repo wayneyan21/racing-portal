@@ -17,13 +17,48 @@ const PUBLIC_DIR = path.join(__dirname, 'public'); // 固定 public 目錄
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
+// Session 一定要喺守門員之前
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || 'change_this_super_secret_key',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 1000 * 60 * 60 * 12 }, // 12 小時
+  })
+);
+
+// 簡單 log
 app.use((req, _res, next) => {
-  console.log('REQ', req.method, req.url);
+  console.log('REQ', req.method, req.url, 'user =', req.session?.user?.username);
   next();
 });
 
+// 🔐 全局守門員（白名單路徑唔檢查登入）
+const PUBLIC_PATHS = new Set([
+  '/login',
+  '/api/health',
+  '/styles.css',
+  '/favicon.ico',
+]);
+
+app.use((req, res, next) => {
+  // 1) 白名單路徑：放行
+  if (PUBLIC_PATHS.has(req.path)) return next();
+
+  // 2) API 給 Flask proxy
+  if (req.path.startsWith('/flask')) return next();
+
+  // 3) 如果已登入：放行
+  if (req.session && req.session.user) return next();
+
+  // 4) 未登入：全部踢去 /login
+  return res.redirect('/login');
+});
+
 // ---------- 靜態檔案 ----------
+// 一定要擺喺守門員之後：咁樣 /index.html /race.html 都會被檢查 session
 app.use(express.static(PUBLIC_DIR));
+
 
 // 健康檢查（Render 用）
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
@@ -60,15 +95,23 @@ function requireAuth(req, res, next) {
 let pool;
 (async () => {
   try {
-    pool = await mysql.createPool({
-      host: process.env.DB_HOST || '127.0.0.1',
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'hkjc_db',
-      port: Number(process.env.DB_PORT || 3306),
-      waitForConnections: true,
-      connectionLimit: 10,
-    });
+    console.log('DB config =>', {
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  database: process.env.DB_NAME,
+});
+
+pool = await mysql.createPool({
+  host: process.env.DB_HOST || '127.0.0.1',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'hkjc_db',
+  port: Number(process.env.DB_PORT || 3306),
+  waitForConnections: true,
+  connectionLimit: 10,
+});
+
     console.log('✅ MySQL connected');
   } catch (e) {
     console.error('❌ MySQL connection failed:', e.message);
@@ -141,7 +184,6 @@ app.get('/app', requireAuth, (_req, res) => {
   return res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
 
-// ...（你後面啲 /api/* routes 可以照保留）
 
 
 // ---------- API routes (protected) ----------
@@ -323,7 +365,7 @@ app.get('/debug/db', async (_req, res) => {
 
   try {
     const [[db]] = await pool.query('SELECT DATABASE() AS db');
-    const [[cnt]] = await pool.query('SELECT COUNT(*) AS total FROM horses');
+    const [[cnt]] = await pool.query('SELECT COUNT(*) AS total FROM horse_profiles');
     res.json({ db: db.db, horses_count: cnt.total });
   } catch (e) {
     res.status(500).json({ error: e.message });
