@@ -101,76 +101,63 @@
 </main>
 
 <script>
-// 1. 讀 URL 參數
+// =========================
+// 1. URL 參數
+// =========================
 const params = new URLSearchParams(window.location.search);
 const raceDate = params.get('date') || new Date().toISOString().slice(0,10);
 const venue    = params.get('venue') || 'ST';
 const raceNo   = Number(params.get('race') || '1');
 
-// 2. Demo 賽事 + 馬匹（之後可換成真正 API）
-const demoRace = (no) => ({
-  no,
-  time: ["12:45","13:15","13:50","14:20","14:50","15:20","15:55","16:25","17:00","17:35","18:05","18:40"][no-1],
-  course: (no%2? "草地":"全天候"),
-  distance: (no%2? 1200:1650),
-  going: "好",
-  status: "預定",
-  runners: Array.from({length: 14}, (_,i)=>({
-    draw: i+1,
-    num: (i+1),
-    name_zh: `示例馬${i+1}`,
-    name_en: `Demo Horse ${i+1}`,
-    rating: 60 + ((i*3)%20),
-    jockey: `騎師${(i%6)+1}`,
-    trainer: `練馬師${(i%5)+1}`,
-    win: (3.2 + (Math.random()*10)).toFixed(1),
-    pla: (1.6 + (Math.random()*6)).toFixed(1),
-    updated_at: new Date().toLocaleTimeString()
-  }))
-});
+// 初始標題（等陣有 DB 資料再 update）
+document.getElementById('title-main').innerHTML =
+  `<strong>第 ${raceNo} 場</strong>`;
+document.getElementById('title-sub').textContent =
+  `${raceDate}・${venue}`;
 
+// =========================
+// 2. 全局狀態
+// =========================
 const state = {
-  race: demoRace(raceNo),
-  tab: 'basic'
+  tab: 'basic',
+  raceMeta: null,   // racecard_races 一行
+  entries: []       // racecard_entries 多行
 };
 
-// 3. 標題
-document.getElementById('title-main').innerHTML =
-  `<strong>第 ${state.race.no} 場</strong>`;
-document.getElementById('title-sub').textContent =
-  `${raceDate}・${venue}・${state.race.course} ${state.race.distance}m`;
-
-// 4. 返回按鈕
+// =========================
+// 3. 返回 / 重新載入
+// =========================
 document.getElementById('btnBack').onclick = () => {
-  // 優先用 history 返回；如果冇就回 index.html
   if (window.history.length > 1) {
     window.history.back();
   } else {
-    const url = new URL(window.location.origin + '/index.html');
-    url.searchParams.set('date', raceDate);
-    url.searchParams.set('venue', venue);
+    const url = new URL(window.location.origin + '/app');
     window.location.href = url.toString();
   }
 };
 
-// 5. 重新載入（之後可改成真正 fetch API）
-document.getElementById('btnReload').onclick = () => {
-  state.race = demoRace(raceNo);   // demo 重新生成 random 賠率
+document.getElementById('btnReload').onclick = async () => {
+  await reloadAll();
   renderCurrentTab();
 };
 
-// 6. Tabs 控制
+// =========================
+// 4. Tabs 控制
+// =========================
 const panels = {
-  basic: document.getElementById('panel-basic'),
-  odds: document.getElementById('panel-odds'),
+  basic:   document.getElementById('panel-basic'),
+  odds:    document.getElementById('panel-odds'),
   runners: document.getElementById('panel-runners')
 };
+
 document.getElementById('tabs').addEventListener('click', (e)=>{
-  const t = e.target.closest('.tab'); if(!t) return;
+  const t = e.target.closest('.tab');
+  if (!t) return;
   state.tab = t.dataset.tab;
   renderTabs();
   renderCurrentTab();
 });
+
 function renderTabs(){
   [...document.getElementById('tabs').children].forEach(t =>
     t.classList.toggle('active', t.dataset.tab===state.tab)
@@ -180,51 +167,161 @@ function renderTabs(){
   );
 }
 
-// 7. 各 panel render
+// =========================
+// 5. 從後端取數據
+// =========================
+
+// 5.1 單日所有場次 → 揀出呢一場
+async function loadRaceMeta() {
+  const url = `/api/racecard/races?date=${raceDate}&venue=${venue}`;
+  console.log('[race] fetch meta:', url);
+
+  const res  = await fetch(url);
+  const rows = await res.json();
+
+  const r = rows.find(x => Number(x.race_no) === raceNo) || null;
+  state.raceMeta = r;
+
+  if (r) {
+    // 更新頁面標題
+    document.getElementById('title-main').innerHTML =
+      `<strong>第 ${r.race_no} 場</strong> ${r.race_name_zh || ''}`;
+    document.getElementById('title-sub').textContent =
+      `${raceDate}・${venue}・${r.course || ''} ${r.distance_m || ''}m・${r.class_text || ''}`;
+  }
+}
+
+// 5.2 取某場馬匹名單
+async function loadEntries() {
+  const url = `/api/racecard/entries?date=${raceDate}&race_no=${raceNo}`;
+  console.log('[race] fetch entries:', url);
+
+  const res  = await fetch(url);
+  const rows = await res.json();
+
+  state.entries = rows.map(r => ({
+    horse_no:  r.horse_no,
+    draw:      r.draw,
+    name_zh:   r.horse_name_zh || '',
+    name_en:   r.horse_name_en || '',
+    rating:    r.rating ?? '',
+    jockey:    r.jockey_zh || '',
+    trainer:   r.trainer_zh || '',
+    owner:     r.owner || '',
+    age:       r.age ?? '',
+    sex:       r.sex || '',
+    gear:      r.gear || '',
+    last6:     r.last6 || '',
+    scratched: !!r.scratched
+  }));
+}
+
+// 同步 reload meta + entries
+async function reloadAll() {
+  try {
+    await Promise.all([loadRaceMeta(), loadEntries()]);
+  } catch (err) {
+    console.error('[race] reload error', err);
+  }
+}
+
+// =========================
+// 6. 各 panel render
+// =========================
+
 function renderBasic(){
-  const r = state.race;
+  const r = state.raceMeta;
   const box = document.getElementById('basicCards');
+
+  if (!r) {
+    box.innerHTML = `
+      <div class="card">
+        <p class="muted">找不到賽事資料（${raceDate}・${venue}・第 ${raceNo} 場）。</p>
+      </div>`;
+    return;
+  }
+
   box.innerHTML = `
     <div class="card">
-      <h3 style="margin:.2rem 0 .6rem">第 ${r.no} 場</h3>
+      <h3 style="margin:.2rem 0 .6rem">第 ${r.race_no} 場 ${r.race_name_zh || ''}</h3>
       <div class="kv">
         <div class="muted">賽日</div><div>${raceDate}</div>
         <div class="muted">場地</div><div>${venue}</div>
-        <div class="muted">開跑時間</div><div>${r.time}</div>
-        <div class="muted">途程</div><div>${r.course} ${r.distance} m</div>
-        <div class="muted">場地狀況</div><div>${r.going}</div>
-        <div class="muted">狀態</div><div>${r.status}</div>
-        <div class="muted">參賽數</div><div>${r.runners.length}</div>
+        <div class="muted">開跑時間</div><div>${(r.race_time || '').slice(0,5)}</div>
+        <div class="muted">途程</div><div>${r.course || ''} ${r.distance_m || ''} m</div>
+        <div class="muted">班次</div><div>${r.class_text || ''}</div>
+        <div class="muted">場地狀況</div><div>${r.going || ''}</div>
+        <div class="muted">參賽數</div><div>${state.entries.length}</div>
       </div>
     </div>
     <div class="card">
       <h4 style="margin:.2rem 0 .4rem">備註</h4>
-      <p class="muted">（連接你的爬蟲後，可在此顯示賽事通告、抽籤、換騎、退賽等）</p>
+      <p class="muted">（之後可以接駁公告、換騎、退賽等資訊顯示喺呢度。）</p>
     </div>`;
 }
-function renderOdds(){
-  const r = state.race;
-  const tbody = document.querySelector('#oddsTable tbody');
-  tbody.innerHTML = r.runners.map(h=>`
-    <tr><td>${h.num}</td><td>${h.name_zh}</td><td>${h.win}</td><td>${h.pla}</td><td class="muted">${h.updated_at}</td></tr>`
-  ).join('');
-}
+
 function renderRunners(){
-  const r = state.race;
   const tbody = document.querySelector('#runnersTable tbody');
-  tbody.innerHTML = r.runners.map(h=>`
-    <tr><td>${h.num}</td><td>${h.name_zh} <span class="muted">/ ${h.name_en}</span></td><td>${h.rating}</td><td>${h.jockey}</td><td>${h.trainer}</td><td>${h.draw}</td></tr>`
-  ).join('');
-}
-function renderCurrentTab(){
-  if (state.tab==='basic')   renderBasic();
-  if (state.tab==='odds')    renderOdds();
-  if (state.tab==='runners') renderRunners();
+  const list  = state.entries;
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="muted">暫時沒有馬匹資料。</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(e => `
+    <tr class="${e.scratched ? 'is-scratched' : ''}">
+      <td>${e.horse_no}</td>
+      <td>${e.name_zh} <span class="muted">/ ${e.name_en || ''}</span></td>
+      <td>${e.rating ?? ''}</td>
+      <td>${e.jockey}</td>
+      <td>${e.trainer}</td>
+      <td>${e.draw}</td>
+    </tr>`).join('');
 }
 
-// 8. 初始 render
+function renderOdds(){
+  const tbody = document.querySelector('#oddsTable tbody');
+  const list  = state.entries;
+
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="5" class="muted">暫未有賠率資料（現時用示例）。</td></tr>`;
+    return;
+  }
+
+  // 暫時用假賠率（之後可改為真正 JSON）
+  tbody.innerHTML = list.map(e => {
+    const win = (2 + Math.random()*10).toFixed(1);
+    const pla = (1.2 + Math.random()*4).toFixed(1);
+    const ts  = new Date().toLocaleTimeString();
+    return `
+      <tr>
+        <td>${e.horse_no}</td>
+        <td>${e.name_zh}</td>
+        <td>${win}</td>
+        <td>${pla}</td>
+        <td class="muted">${ts}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderCurrentTab(){
+  if (state.tab === 'basic')   renderBasic();
+  if (state.tab === 'odds')    renderOdds();
+  if (state.tab === 'runners') renderRunners();
+}
+
+// =========================
+// 7. 初始化
+// =========================
 renderTabs();
-renderCurrentTab();
+reloadAll().then(() => {
+  renderCurrentTab();
+}).catch(err => {
+  console.error(err);
+  renderCurrentTab();
+});
 </script>
+
 </body>
 </html>
