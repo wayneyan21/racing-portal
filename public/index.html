@@ -220,6 +220,23 @@
 </div>
 
 <script>
+
+async function loadRacesFromServer() {
+  const url = `/api/racecard/races?date=${state.raceDate}&venue=${state.venue}`;
+  const res = await fetch(url);
+  const rows = await res.json();
+
+  state.races = rows.map(r => ({
+    no: r.race_no,
+    time: (r.race_time || '').slice(0,5),
+    course: r.course || '',
+    distance: r.distance_m || 0,
+    going: r.going || '',
+    status: '預定',
+  }));
+}
+
+
 // 後端 Flask API（之後可以換成 Render 上的 URL）
 const API_BASE = 'http://127.0.0.1:5000';
 
@@ -311,7 +328,7 @@ function renderControls(){
   }
 
   if(state.view==='meeting'){
-    document.getElementById('btnLoad').onclick = ()=>{ state.races = Array.from({length:12},(_,i)=> demoRace(i+1)); renderMeeting(); };
+    document.getElementById('btnLoad').onclick = async () => { await loadRacesFromServer(); renderMeeting(); };
     document.getElementById('btnArchive').onclick = archiveToday;
     document.getElementById('btnOpenHistory').onclick = ()=>{ renderHistory(); toggleDrawer(true); };
     document.getElementById('raceDate').onchange = (e)=>{ state.raceDate = e.target.value; renderMeetingSummary(); };

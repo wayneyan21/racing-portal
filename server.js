@@ -76,16 +76,6 @@ if (process.env.FLASK_URL) {
   );
 }
 
-// Session
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET || 'change_this_super_secret_key',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 1000 * 60 * 60 * 12 }, // 12 小時
-  })
-);
-
 function requireAuth(req, res, next) {
   if (req.session && req.session.user) return next();
   return res.redirect('/login');
@@ -227,6 +217,62 @@ app.get('/api/trainers', requireAuth, async (_req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// 取得某日所有場次（racecard_races）
+app.get('/api/racecard/races', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: "DB not ready" });
+
+  try {
+    const date = req.query.date;
+    const venue = req.query.venue; // 'ST' or 'HV'
+
+    if (!date || !venue) {
+      return res.status(400).json({ error: "Missing date or venue" });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT
+         race_no, race_time, race_name_zh, distance_m, course, going, class_text
+       FROM racecard_races
+       WHERE race_date = ? AND venue_code = ?
+       ORDER BY race_no`,
+      [date, venue]
+    );
+
+    res.json(rows);
+  } catch (err) {
+    console.error("API /racecard/races error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// 取得某一場所有馬（racecard_entries）
+app.get('/api/racecard/entries', requireAuth, async (req, res) => {
+  try {
+    const date = req.query.date;
+    const raceNo = req.query.race_no;
+
+    if (!date || !raceNo) {
+      return res.status(400).json({ error: 'Missing race_date or race_no' });
+    }
+
+    const [rows] = await pool.query(
+      `SELECT horse_no, draw, horse_name_zh, horse_name_en,
+              jockey_zh, trainer_zh, rating, rating_pm,
+              declared_wt, owner, age, sex, gear, last6, scratched
+       FROM racecard_entries
+       WHERE race_date = ? AND race_no = ?
+       ORDER BY horse_no`,
+      [date, raceNo]
+    );
+
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // 取得馬匹資料（最簡版）
 app.get('/api/horses', requireAuth, async (_req, res) => {
