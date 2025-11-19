@@ -101,14 +101,14 @@
   </div>
 </div>
 
-<!-- ===== Context controls (change with view) ===== -->
+<!-- ===== Context controls ===== -->
 <header class="controls" id="controls">
   <div class="left" id="controls-left"></div>
   <div class="right" id="controls-right"></div>
 </header>
 
 <main>
-  <!-- ===== View: Meeting (只負責揀場次，唔再顯示細節) ===== -->
+  <!-- ===== View: Meeting ===== -->
   <div class="view active" id="view-meeting">
     <div class="grid-meeting">
       <aside>
@@ -182,7 +182,7 @@
     </div>
   </div>
 
-  <!-- ===== View: Stats (示例) ===== -->
+  <!-- ===== View: Stats ===== -->
   <div class="view" id="view-stats">
     <div class="table-wrap" style="padding:1rem;">
       <h3 style="margin-top:.2rem;">統計（示例）</h3>
@@ -220,69 +220,59 @@
 </div>
 
 <script>
-
-// 由 server /api/racecard/races 讀取排位，並更新畫面
-async function loadRacesFromServer() {
-  try {
-    const url = `/api/racecard/races?date=${state.raceDate}&venue=${state.venue}`;
-    console.log('[loadRacesFromServer] GET', url);
-
-    const res = await fetch(url);
-    if (!res.ok) {
-      console.error('loadRacesFromServer HTTP error', res.status, await res.text());
-      state.races = [];
-      renderMeeting();        // 就算出錯都清空畫面
-      return;
-    }
-
-    const rows = await res.json();
-    console.log('[loadRacesFromServer] rows =', rows.length);
-
-    state.races = rows.map(r => ({
-      no:       r.race_no,
-      time:     (r.race_time || '').slice(0, 5),   // "13:00:00" → "13:00"
-      course:   r.course || '',
-      distance: r.distance_m || 0,
-      going:    r.going || '',
-      status:   r.class_text || '預定',            // 暫時用班次做 status
-    }));
-
-    // 重新畫賽日總覽
-    renderMeeting();
-  } catch (err) {
-    console.error('[loadRacesFromServer] error', err);
-    state.races = [];
-    renderMeeting();
-  }
-}
-
-
-// 後端 Flask API（之後可以換成 Render 上的 URL）
-const API_BASE = 'http://127.0.0.1:5000';
+// ===== 後端 API base（Flask 之後可以用 /flask proxy）=====
+const API_BASE = '/flask'; // 暫時用唔到都冇所謂，meeting view 唔會 call
 
 /****************************
- * Demo 數據與狀態
+ * 工具：歷史儲存在 localStorage
  ****************************/
-const demoRace = (no) => ({ ... });
+function loadHistory(){
+  try{ return JSON.parse(localStorage.getItem('hkjc_history')||'[]'); }catch(e){ return []; }
+}
+function saveHistory(list){
+  localStorage.setItem('hkjc_history', JSON.stringify(list));
+}
 
+/****************************
+ * Demo Race（如果後端冇 data 就用）
+ ****************************/
+function demoRace(no){
+  return {
+    no,
+    time: '--:--',
+    course: '',
+    distance: 0,
+    going: '',
+    status: '預定',
+  };
+}
+
+/****************************
+ * 全局狀態
+ ****************************/
 const state = {
   view: 'meeting',
-  raceDate: null,        // 等落後端最新 race_date
+  raceDate: null,      // YYYY-MM-DD
   venue: 'ST',
-  races: Array.from({length:12}, (_,i)=> demoRace(i+1)),
-  ...
+  races: [],
+  horses: [],
+  jockeys: [],
+  trainers: [],
+  history: loadHistory(),
 };
 
 // ===== 排位日期 cache / API =====
 let cachedRaceDates = null;
 
-// 取全部有排位的 race_date（由新到舊）
+// /api/racecard/dates 會回 [{"2025-11-15T00:00:00.000Z", ...}]
 async function fetchRaceDates() {
   if (cachedRaceDates) return cachedRaceDates;
   try {
     const res = await fetch('/api/racecard/dates');
     const arr = await res.json();
-    cachedRaceDates = Array.isArray(arr) ? arr : [];
+    cachedRaceDates = (Array.isArray(arr) ? arr : [])
+      .map(d => typeof d === 'string' ? d.slice(0,10) : '')
+      .filter(Boolean);         // 只保留 YYYY-MM-DD
   } catch (e) {
     console.error('fetchRaceDates error', e);
     cachedRaceDates = [];
@@ -290,28 +280,18 @@ async function fetchRaceDates() {
   return cachedRaceDates;
 }
 
-// 取最新一日，塞入 state.raceDate
+// 取最新一日
 async function fetchLatestRaceDate() {
   const dates = await fetchRaceDates();
   if (dates.length) {
-    state.raceDate = dates[0];  // 只用最新日
+    state.raceDate = dates[0];  // 已經係 YYYY-MM-DD
   } else {
-    // 如果 DB 暫時冇，就 fallback 去今日
     state.raceDate = new Date().toISOString().slice(0,10);
   }
 }
 
-
 /****************************
- * 儲存/讀取 歷史
- ****************************/
-function loadHistory(){
-  try{ return JSON.parse(localStorage.getItem('hkjc_history')||'[]'); }catch(e){ return [] }
-}
-function saveHistory(list){ localStorage.setItem('hkjc_history', JSON.stringify(list)); }
-
-/****************************
- * 元素引用
+ * DOM 元素引用
  ****************************/
 const el = {
   menubar: document.getElementById('menubar'),
@@ -323,7 +303,7 @@ const el = {
     jockeys: document.getElementById('view-jockeys'),
     trainers: document.getElementById('view-trainers'),
     stats: document.getElementById('view-stats'),
-    settings: document.getElementById('view-settings')
+    settings: document.getElementById('view-settings'),
   },
   raceList: document.getElementById('raceList'),
   summary: document.getElementById('summary'),
@@ -335,13 +315,55 @@ const el = {
 };
 
 /****************************
+ * 從 server 讀排位
+ ****************************/
+async function loadRacesFromServer() {
+  try {
+    const d = (state.raceDate || '').slice(0,10);   // 一定用 YYYY-MM-DD
+    const url = `/api/racecard/races?date=${encodeURIComponent(d)}&venue=${encodeURIComponent(state.venue)}`;
+    console.log('[loadRacesFromServer] GET', url);
+
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('loadRacesFromServer HTTP error', res.status, await res.text());
+      state.races = [];
+      renderMeeting();
+      return;
+    }
+
+    const rows = await res.json();
+    console.log('[loadRacesFromServer] rows =', rows.length);
+
+    if (!rows.length) {
+      // 冇 data，就用 12 場 demo 頂住
+      state.races = Array.from({length:12}, (_,i)=> demoRace(i+1));
+    } else {
+      state.races = rows.map(r => ({
+        no:       r.race_no,
+        time:     (r.race_time || '').slice(0,5),
+        course:   r.course || '',
+        distance: r.distance_m || 0,
+        going:    r.going || '',
+        status:   r.class_text || '預定',
+      }));
+    }
+    renderMeeting();
+  } catch (err) {
+    console.error('[loadRacesFromServer] error', err);
+    state.races = Array.from({length:12}, (_,i)=> demoRace(i+1));
+    renderMeeting();
+  }
+}
+
+/****************************
  * 控制列：依視圖變化
  ****************************/
 function renderControls(){
   const left = el.controlsLeft, right = el.controlsRight;
-  left.innerHTML = ''; right.innerHTML='';
+  left.innerHTML = '';
+  right.innerHTML = '';
 
-  if(state.view==='meeting'){
+  if (state.view === 'meeting') {
     left.innerHTML = `
       <div class="field"><label class="muted">賽日</label>
         <input id="raceDate" type="date" value="${state.raceDate || ''}">
@@ -352,57 +374,68 @@ function renderControls(){
           <option value="HV" ${state.venue==='HV'?'selected':''}>跑馬地 HV</option>
         </select>
       </div>
-      <button class="btn primary" id="btnLoad">載入最新賽日</button>`;
-    right.innerHTML = `<button class="btn" id="btnOpenHistory">歷史</button><button class="btn accent" id="btnArchive">封存當日</button>`;
-  } else if(state.view==='horses'){
+      <button class="btn primary" id="btnLoad">載入最新賽日</button>
+    `;
+    right.innerHTML = `
+      <button class="btn" id="btnOpenHistory">歷史</button>
+      <button class="btn accent" id="btnArchive">封存當日</button>
+    `;
+  } else if (state.view === 'horses') {
     left.innerHTML = `<strong>馬匹清單</strong>`;
     right.innerHTML = `
       <button class="btn" id="btnHistory">歷史</button>
-      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>`;
-  } else if(state.view==='jockeys'){
+      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>
+    `;
+  } else if (state.view === 'jockeys') {
     left.innerHTML = `<strong>騎師名單</strong>`;
     right.innerHTML = `
       <button class="btn" id="btnHistory">歷史</button>
-      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>`;
-  } else if(state.view==='trainers'){
+      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>
+    `;
+  } else if (state.view === 'trainers') {
     left.innerHTML = `<strong>練馬師名單</strong>`;
-  } else if(state.view==='stats'){
+  } else if (state.view === 'stats') {
     left.innerHTML = `<strong>統計</strong>`;
-  } else if(state.view==='settings'){
+  } else if (state.view === 'settings') {
     left.innerHTML = `<strong>系統設定</strong>`;
   }
 
-  // === meeting view 控制 ===
+  // ===== meeting view 控件事件 =====
   if (state.view === 'meeting') {
-  // 「載入最新賽日」：問後端最新 race_date，然後拉返該日排位
-  document.getElementById('btnLoad').onclick = async () => {
-    await fetchLatestRaceDate();          // 更新 state.raceDate 為最新一日
-    const input = document.getElementById('raceDate');
-    if (input) input.value = state.raceDate;
-    await loadRacesFromServer();          // 真正向 /api/racecard/races 取數據
-  };
+    const btnLoad = document.getElementById('btnLoad');
+    const btnArchive = document.getElementById('btnArchive');
+    const btnOpenHistory = document.getElementById('btnOpenHistory');
+    const inputDate = document.getElementById('raceDate');
+    const selectVenue = document.getElementById('venue');
 
-  document.getElementById('btnArchive').onclick = archiveToday;
-  document.getElementById('btnOpenHistory').onclick = () => {
-    renderHistory();
-    toggleDrawer(true);
-  };
+    if (btnLoad) {
+      btnLoad.onclick = async () => {
+        await fetchLatestRaceDate();
+        if (inputDate) inputDate.value = state.raceDate;
+        await loadRacesFromServer();
+      };
+    }
 
-  // 改賽日：立刻根據嗰日 race_date 重新拉排位
-  document.getElementById('raceDate').onchange = async (e) => {
-    state.raceDate = e.target.value;
-    await loadRacesFromServer();
-  };
+    if (btnArchive) btnArchive.onclick = archiveToday;
+    if (btnOpenHistory) btnOpenHistory.onclick = () => { renderHistory(); toggleDrawer(true); };
 
-  // 改場地：一樣重新拉排位
-  document.getElementById('venue').onchange = async (e) => {
-    state.venue = e.target.value;
-    await loadRacesFromServer();
-  };
-}
+    if (inputDate) {
+      inputDate.onchange = async (e) => {
+        state.raceDate = e.target.value;
+        await loadRacesFromServer();
+      };
+    }
 
-  // === 馬匹 / 騎師 view 的「歷史」掣 ===
-  if(state.view==='horses' || state.view==='jockeys'){
+    if (selectVenue) {
+      selectVenue.onchange = async (e) => {
+        state.venue = e.target.value;
+        await loadRacesFromServer();
+      };
+    }
+  }
+
+  // ===== 馬匹 / 騎師 view 的「歷史」掣 =====
+  if (state.view === 'horses' || state.view === 'jockeys') {
     const btn = document.getElementById('btnHistory');
     const sel = document.getElementById('historyDate');
     if (btn && sel) {
@@ -416,28 +449,33 @@ function renderControls(){
       sel.onchange = () => {
         const d = sel.value;
         console.log('[歷史] 選擇日期 =', d);
-        // 之後如果你想：可以根據 d 去 call 馬匹 / 騎師歷史 API
+        // 之後可以根據 d 去 call 歷史 API
       };
     }
   }
 }
 
-
 /****************************
  * Menu 切換視圖
  ****************************/
 el.menubar.addEventListener('click', (e)=>{
-  const btn = e.target.closest('.menu-btn'); if(!btn) return;
+  const btn = e.target.closest('.menu-btn');
+  if (!btn) return;
   state.view = btn.dataset.view;
   renderView();
 });
+
 function renderView(){
-  [...el.menubar.querySelectorAll('.menu-btn')].forEach(b=> b.setAttribute('aria-current', b.dataset.view===state.view? 'page': 'false'));
-  Object.entries(el.views).forEach(([k,v])=> v.classList.toggle('active', k===state.view));
+  [...el.menubar.querySelectorAll('.menu-btn')]
+    .forEach(b => b.setAttribute('aria-current', b.dataset.view === state.view ? 'page' : 'false'));
+
+  Object.entries(el.views)
+    .forEach(([k,v]) => v.classList.toggle('active', k === state.view));
+
   renderControls();
 
   if (state.view === 'meeting')  renderMeeting();
-  if (state.view === 'horses')   (async ()=>{ await fetchHorsesFromAPI(); renderHorses(); })();
+  if (state.view === 'horses')   renderHorses();   // 先用空 list
   if (state.view === 'jockeys')  renderJockeys();
   if (state.view === 'trainers') renderTrainers();
 }
@@ -445,8 +483,13 @@ function renderView(){
 /****************************
  * Meeting（只負責列出場次＋跳去 race.html）
  ****************************/
-function renderMeeting(){ renderMeetingSummary(); renderRaceList(); }
-function renderMeetingSummary(){ el.summary.textContent = `${state.raceDate}・${state.venue}・共 ${state.races.length} 場`; }
+function renderMeeting(){
+  renderMeetingSummary();
+  renderRaceList();
+}
+function renderMeetingSummary(){
+  el.summary.textContent = `${state.raceDate || '--'}・${state.venue}・共 ${state.races.length} 場`;
+}
 
 function renderRaceList(){
   el.raceList.innerHTML = '';
@@ -473,128 +516,140 @@ function renderRaceList(){
 
 /****************************
  * Horses / Jockeys / Trainers
+ * （暫時用空 list，不接後端）
  ****************************/
-async function fetchHorsesFromAPI() {
-  const sex = document.getElementById('sexFilter').value || '';
-  const min = Number(document.getElementById('ratingMin').value || 0);
-  const q   = (document.getElementById('qHorses').value || '').trim();
-
-  const url = new URL(`${API_BASE}/api/horses`);
-  if (q) url.searchParams.set('q', q);
-  if (sex) url.searchParams.set('sex', sex);
-  if (min) url.searchParams.set('rating_min', String(min));
-  url.searchParams.set('limit', '200');
-
-  const res  = await fetch(url.toString());
-  const json = await res.json();
-  const rows = Array.isArray(json) ? json : (json.items || json.data || []);
-
-  state.horses = rows.map(r => ({
-    code:   r.horse_code || r.horse_id || '',
-    name_zh: r.name || r.name_chi || '',
-    name_en: r.name_eng || '',
-    sex:    r.sex || '',
-    age:    r.age ?? '',
-    rating: r.current_rating ?? r.season_rating ?? 0,
-    trainer: r.trainer || r.trainer_id || '',
-    form:    r.last10_racedays || ''
-  }));
-}
-
 function renderHorses(){
-  const sex = document.getElementById('sexFilter').value || '';
-  const min = Number(document.getElementById('ratingMin').value||0);
-  const q = (document.getElementById('qHorses').value||'').toLowerCase();
-  const list = state.horses.filter(h=>
-    (!sex || h.sex===sex) && h.rating>=min &&
-    (h.name_zh.includes(q) || h.name_en.toLowerCase().includes(q) || h.code.toLowerCase().includes(q))
+  const sex = document.getElementById('sexFilter')?.value || '';
+  const min = Number(document.getElementById('ratingMin')?.value || 0);
+  const q = (document.getElementById('qHorses')?.value || '').toLowerCase();
+  const list = state.horses.filter(h =>
+    (!sex || h.sex === sex) &&
+    h.rating >= min &&
+    (h.name_zh.includes(q) || (h.name_en||'').toLowerCase().includes(q) || (h.code||'').toLowerCase().includes(q))
   );
   el.horsesTableBody.innerHTML = list.map(h=>`
-    <tr><td>${h.code}</td><td>${h.name_zh} <span class="muted">/ ${h.name_en}</span></td><td>${h.sex}</td><td>${h.age}</td><td>${h.rating}</td><td>${h.trainer}</td><td>${h.form}</td></tr>`).join('');
-  document.getElementById('stat-horses') && (document.getElementById('stat-horses').textContent = state.horses.length);
+    <tr>
+      <td>${h.code}</td>
+      <td>${h.name_zh} <span class="muted">/ ${h.name_en||''}</span></td>
+      <td>${h.sex}</td>
+      <td>${h.age}</td>
+      <td>${h.rating}</td>
+      <td>${h.trainer}</td>
+      <td>${h.form}</td>
+    </tr>`).join('');
+  const stat = document.getElementById('stat-horses');
+  if (stat) stat.textContent = state.horses.length;
 }
-['qHorses','sexFilter','ratingMin'].forEach(id=>{
-  document.addEventListener('input', async (e)=>{
-    if(e.target.id === id && state.view==='horses'){
-      await fetchHorsesFromAPI();
-      renderHorses();
-    }
-  });
-});
 
 function renderJockeys(){
-  const claim = document.getElementById('claimFilter').value;
-  const q = (document.getElementById('qJockeys').value||'').toLowerCase();
-  const list = state.jockeys.filter(j=>
-    (!claim || (claim==='Y'? j.claim : !j.claim)) &&
-    (j.name.toLowerCase().includes(q))
+  const claim = document.getElementById('claimFilter')?.value || '';
+  const q = (document.getElementById('qJockeys')?.value || '').toLowerCase();
+  const list = state.jockeys.filter(j =>
+    (!claim || (claim === 'Y' ? j.claim : !j.claim)) &&
+    j.name.toLowerCase().includes(q)
   );
-  el.jockeysTableBody.innerHTML = list.map(j=>{
-    const winRate = j.runs? ((j.win/j.runs)*100).toFixed(1)+'%' : '—';
-    return `<tr><td>${j.id}</td><td>${j.name}${j.claim? ' <span class="muted">(見習)</span>':''}</td><td>${j.runs}</td><td>${j.win}</td><td>${j.place2}</td><td>${j.place3}</td><td>${winRate}</td><td>${j.prize.toLocaleString()}</td></tr>`;
+  el.jockeysTableBody.innerHTML = list.map(j => {
+    const winRate = j.runs ? ((j.win/j.runs)*100).toFixed(1)+'%' : '—';
+    return `<tr>
+      <td>${j.id}</td>
+      <td>${j.name}${j.claim ? ' <span class="muted">(見習)</span>' : ''}</td>
+      <td>${j.runs}</td><td>${j.win}</td><td>${j.place2}</td><td>${j.place3}</td>
+      <td>${winRate}</td><td>${j.prize.toLocaleString()}</td>
+    </tr>`;
   }).join('');
-  document.getElementById('stat-jockeys') && (document.getElementById('stat-jockeys').textContent = state.jockeys.length);
+  const stat = document.getElementById('stat-jockeys');
+  if (stat) stat.textContent = state.jockeys.length;
 }
-['qJockeys','claimFilter'].forEach(id=>{
-  document.addEventListener('input', (e)=>{ if(e.target.id===id && state.view==='jockeys') renderJockeys(); });
-});
 
 function renderTrainers(){
-  const q = (document.getElementById('qTrainers').value||'').toLowerCase();
-  const list = state.trainers.filter(t=> t.name.toLowerCase().includes(q));
-  el.trainersTableBody.innerHTML = list.map(t=>{
-    const winRate = t.runs? ((t.win/t.runs)*100).toFixed(1)+'%' : '—';
-    return `<tr><td>${t.id}</td><td>${t.name}</td><td>${t.runs}</td><td>${t.win}</td><td>${t.place2}</td><td>${t.place3}</td><td>${winRate}</td><td>${t.prize.toLocaleString()}</td></tr>`;
+  const q = (document.getElementById('qTrainers')?.value || '').toLowerCase();
+  const list = state.trainers.filter(t => t.name.toLowerCase().includes(q));
+  el.trainersTableBody.innerHTML = list.map(t => {
+    const winRate = t.runs ? ((t.win/t.runs)*100).toFixed(1)+'%' : '—';
+    return `<tr>
+      <td>${t.id}</td><td>${t.name}</td><td>${t.runs}</td>
+      <td>${t.win}</td><td>${t.place2}</td><td>${t.place3}</td>
+      <td>${winRate}</td><td>${t.prize.toLocaleString()}</td>
+    </tr>`;
   }).join('');
-  document.getElementById('stat-trainers') && (document.getElementById('stat-trainers').textContent = state.trainers.length);
+  const stat = document.getElementById('stat-trainers');
+  if (stat) stat.textContent = state.trainers.length;
 }
-['qTrainers'].forEach(id=>{ document.addEventListener('input',(e)=>{ if(e.target.id===id && state.view==='trainers') renderTrainers(); }); });
 
 /****************************
  * 歷史抽屜
  ****************************/
-function toggleDrawer(open){ el.drawer.classList.toggle('open', open); }
+function toggleDrawer(open){
+  el.drawer.classList.toggle('open', open);
+}
 function renderHistory(){
-  const list = state.history; el.historyList.innerHTML = '';
-  if(!list.length){ el.historyList.innerHTML = `<div class="empty">尚未封存任何賽日。</div>`; return; }
+  const list = state.history;
+  el.historyList.innerHTML = '';
+  if (!list.length) {
+    el.historyList.innerHTML = `<div class="empty">尚未封存任何賽日。</div>`;
+    return;
+  }
   list.slice().reverse().forEach(item=>{
-    const row = document.createElement('div'); row.className='history-item';
+    const row = document.createElement('div');
+    row.className = 'history-item';
     row.innerHTML = `
-      <div><strong>${item.raceDate}</strong>・<span class="muted">${item.venue}</span><div class="muted">共 ${item.races.length} 場</div></div>
-      <div><button class="btn" data-act="preview">套用</button><button class="btn danger" data-act="delete">刪除</button></div>`;
+      <div>
+        <strong>${item.raceDate}</strong>・<span class="muted">${item.venue}</span>
+        <div class="muted">共 ${item.races.length} 場</div>
+      </div>
+      <div>
+        <button class="btn" data-act="preview">套用</button>
+        <button class="btn danger" data-act="delete">刪除</button>
+      </div>`;
     row.querySelector('[data-act="preview"]').onclick = ()=>{
-      state.view='meeting'; renderView();
-      state.raceDate=item.raceDate; state.venue=item.venue; state.races=item.races; renderMeeting(); toggleDrawer(false);
+      state.view = 'meeting';
+      state.raceDate = item.raceDate;
+      state.venue = item.venue;
+      state.races = item.races;
+      renderView();
+      toggleDrawer(false);
     };
     row.querySelector('[data-act="delete"]').onclick = ()=>{
-      const idx = state.history.findIndex(x=>x.id===item.id); if(idx>-1){ state.history.splice(idx,1); saveHistory(state.history); renderHistory(); }
+      const idx = state.history.findIndex(x=>x.id === item.id);
+      if (idx > -1) {
+        state.history.splice(idx,1);
+        saveHistory(state.history);
+        renderHistory();
+      }
     };
     el.historyList.appendChild(row);
   });
 }
+
 function archiveToday(){
-  const snapshot = JSON.parse(JSON.stringify({ id: crypto.randomUUID(), raceDate: state.raceDate, venue: state.venue, races: state.races }));
-  state.history.push(snapshot); saveHistory(state.history); renderHistory(); toggleDrawer(true);
+  const snapshot = {
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now())),
+    raceDate: state.raceDate,
+    venue: state.venue,
+    races: state.races,
+  };
+  state.history.push(snapshot);
+  saveHistory(state.history);
+  renderHistory();
+  toggleDrawer(true);
 }
 
 /****************************
  * 初始化
  ****************************/
 async function init() {
-  // 1) 問後端「最新有排位」的 race_date → 塞入 state.raceDate
-  await fetchLatestRaceDate();
-
-  // 2) 用呢個 race_date + state.venue 向 /api/racecard/races 取排位
-  await loadRacesFromServer();
-
-  // 3) 再 render 畫面（會畫控制列 + 賽日總覽）
+  try {
+    await fetchLatestRaceDate();
+    await loadRacesFromServer();
+  } catch (e) {
+    console.error('init error', e);
+    // 如果後端完全失敗，就用 demo
+    state.races = Array.from({length:12}, (_,i)=> demoRace(i+1));
+  }
   renderView();
 }
 
-// 啟動
-init();
-
-
+document.addEventListener('DOMContentLoaded', init);
 </script>
 </body>
 </html>
