@@ -221,19 +221,39 @@
 
 <script>
 
+// 由 server /api/racecard/races 讀取排位，並更新畫面
 async function loadRacesFromServer() {
-  const url = `/api/racecard/races?date=${state.raceDate}&venue=${state.venue}`;
-  const res = await fetch(url);
-  const rows = await res.json();
+  try {
+    const url = `/api/racecard/races?date=${state.raceDate}&venue=${state.venue}`;
+    console.log('[loadRacesFromServer] GET', url);
 
-  state.races = rows.map(r => ({
-    no: r.race_no,
-    time: (r.race_time || '').slice(0,5),
-    course: r.course || '',
-    distance: r.distance_m || 0,
-    going: r.going || '',
-    status: '預定',
-  }));
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error('loadRacesFromServer HTTP error', res.status, await res.text());
+      state.races = [];
+      renderMeeting();        // 就算出錯都清空畫面
+      return;
+    }
+
+    const rows = await res.json();
+    console.log('[loadRacesFromServer] rows =', rows.length);
+
+    state.races = rows.map(r => ({
+      no:       r.race_no,
+      time:     (r.race_time || '').slice(0, 5),   // "13:00:00" → "13:00"
+      course:   r.course || '',
+      distance: r.distance_m || 0,
+      going:    r.going || '',
+      status:   r.class_text || '預定',            // 暫時用班次做 status
+    }));
+
+    // 重新畫賽日總覽
+    renderMeeting();
+  } catch (err) {
+    console.error('[loadRacesFromServer] error', err);
+    state.races = [];
+    renderMeeting();
+  }
 }
 
 
@@ -353,19 +373,33 @@ function renderControls(){
   }
 
   // === meeting view 控制 ===
-  if(state.view==='meeting'){
-    document.getElementById('btnLoad').onclick = async ()=>{
-      await fetchLatestRaceDate();   // 再用最新排位日
-      renderMeetingSummary();
-      renderRaceList();
-      const input = document.getElementById('raceDate');
-      if (input) input.value = state.raceDate;
-    };
-    document.getElementById('btnArchive').onclick = archiveToday;
-    document.getElementById('btnOpenHistory').onclick = ()=>{ renderHistory(); toggleDrawer(true); };
-    document.getElementById('raceDate').onchange = (e)=>{ state.raceDate = e.target.value; renderMeetingSummary(); };
-    document.getElementById('venue').onchange = (e)=>{ state.venue = e.target.value; renderMeetingSummary(); };
-  }
+  if (state.view === 'meeting') {
+  // 「載入最新賽日」：問後端最新 race_date，然後拉返該日排位
+  document.getElementById('btnLoad').onclick = async () => {
+    await fetchLatestRaceDate();          // 更新 state.raceDate 為最新一日
+    const input = document.getElementById('raceDate');
+    if (input) input.value = state.raceDate;
+    await loadRacesFromServer();          // 真正向 /api/racecard/races 取數據
+  };
+
+  document.getElementById('btnArchive').onclick = archiveToday;
+  document.getElementById('btnOpenHistory').onclick = () => {
+    renderHistory();
+    toggleDrawer(true);
+  };
+
+  // 改賽日：立刻根據嗰日 race_date 重新拉排位
+  document.getElementById('raceDate').onchange = async (e) => {
+    state.raceDate = e.target.value;
+    await loadRacesFromServer();
+  };
+
+  // 改場地：一樣重新拉排位
+  document.getElementById('venue').onchange = async (e) => {
+    state.venue = e.target.value;
+    await loadRacesFromServer();
+  };
+}
 
   // === 馬匹 / 騎師 view 的「歷史」掣 ===
   if(state.view==='horses' || state.view==='jockeys'){
@@ -547,14 +581,19 @@ function archiveToday(){
  * 初始化
  ****************************/
 async function init() {
-  // 先向後端問「最新有排位」的 race_date
+  // 1) 問後端「最新有排位」的 race_date → 塞入 state.raceDate
   await fetchLatestRaceDate();
-  renderControls();
+
+  // 2) 用呢個 race_date + state.venue 向 /api/racecard/races 取排位
+  await loadRacesFromServer();
+
+  // 3) 再 render 畫面（會畫控制列 + 賽日總覽）
   renderView();
 }
 
 // 啟動
 init();
+
 
 </script>
 </body>
