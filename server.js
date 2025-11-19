@@ -218,6 +218,24 @@ app.get('/api/trainers', requireAuth, async (_req, res) => {
   }
 });
 
+// 取得有排位資料的 race_date 列表（由新到舊）
+app.get('/api/racecard/dates', requireAuth, async (_req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
+  try {
+    const [rows] = await pool.query(
+      'SELECT DISTINCT race_date FROM racecard_races ORDER BY race_date DESC LIMIT 365'
+    );
+    // 只回傳日期字串，例如 ["2025-11-18","2025-11-15", ...]
+    res.json(rows.map(r => r.race_date));
+  } catch (e) {
+    console.error('API /racecard/dates error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+
 // 取得某日所有場次（racecard_races）
 app.get('/api/racecard/races', requireAuth, async (req, res) => {
   if (!pool) return res.status(503).json({ error: "DB not ready" });
