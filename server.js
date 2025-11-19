@@ -224,7 +224,7 @@ app.get('/api/racecard/dates', requireAuth, async (_req, res) => {
 
   try {
     const [rows] = await pool.query(
-      'SELECT DISTINCT race_date FROM racecard_races ORDER BY race_date DESC LIMIT 365'
+      'SELECT DISTINCT DATE(race_date) AS race_date FROM racecard_races ORDER BY DATE(race_date) DESC LIMIT 365'
     );
     // 只回傳日期字串，例如 ["2025-11-18","2025-11-15", ...]
     res.json(rows.map(r => r.race_date));
