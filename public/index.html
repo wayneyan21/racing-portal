@@ -243,31 +243,44 @@ const API_BASE = 'http://127.0.0.1:5000';
 /****************************
  * Demo 數據與狀態
  ****************************/
-const demoRace = (no) => ({
-  no,
-  time: ["12:45","13:15","13:50","14:20","14:50","15:20","15:55","16:25","17:00","17:35","18:05","18:40"][no-1],
-  course: (no%2? "草地":"全天候"),
-  distance: (no%2? 1200:1650),
-  going: "好",
-  status: "預定"
-});
-const todayISO = new Date().toISOString().slice(0,10);
+const demoRace = (no) => ({ ... });
 
 const state = {
   view: 'meeting',
-  raceDate: todayISO,
+  raceDate: null,        // 等落後端最新 race_date
   venue: 'ST',
   races: Array.from({length:12}, (_,i)=> demoRace(i+1)),
-  activeRaceNo: 1,
-  history: loadHistory(),
-  horses: [],   // 由 API 載入
-  jockeys: Array.from({length:12}, (_,i)=> ({
-    id: i+1, name: `騎師${i+1}`, runs: 120+i*7, win: 20+i, place2: 28+i*2, place3: 30+i*2, prize: 3000000+i*80000, claim: (i%4===0)
-  })),
-  trainers: Array.from({length:10}, (_,i)=> ({
-    id: i+1, name: `練馬師${i+1}`, runs: 160+i*9, win: 18+i, place2: 31+i*2, place3: 33+i*2, prize: 5200000+i*120000
-  }))
+  ...
 };
+
+// ===== 排位日期 cache / API =====
+let cachedRaceDates = null;
+
+// 取全部有排位的 race_date（由新到舊）
+async function fetchRaceDates() {
+  if (cachedRaceDates) return cachedRaceDates;
+  try {
+    const res = await fetch('/api/racecard/dates');
+    const arr = await res.json();
+    cachedRaceDates = Array.isArray(arr) ? arr : [];
+  } catch (e) {
+    console.error('fetchRaceDates error', e);
+    cachedRaceDates = [];
+  }
+  return cachedRaceDates;
+}
+
+// 取最新一日，塞入 state.raceDate
+async function fetchLatestRaceDate() {
+  const dates = await fetchRaceDates();
+  if (dates.length) {
+    state.raceDate = dates[0];  // 只用最新日
+  } else {
+    // 如果 DB 暫時冇，就 fallback 去今日
+    state.raceDate = new Date().toISOString().slice(0,10);
+  }
+}
+
 
 /****************************
  * 儲存/讀取 歷史
@@ -307,18 +320,30 @@ const el = {
 function renderControls(){
   const left = el.controlsLeft, right = el.controlsRight;
   left.innerHTML = ''; right.innerHTML='';
+
   if(state.view==='meeting'){
     left.innerHTML = `
-      <div class="field"><label class="muted">賽日</label><input id="raceDate" type="date" value="${state.raceDate}"></div>
+      <div class="field"><label class="muted">賽日</label>
+        <input id="raceDate" type="date" value="${state.raceDate || ''}">
+      </div>
       <div class="field"><label class="muted">場地</label>
-        <select id="venue"><option value="ST" ${state.venue==='ST'?'selected':''}>沙田 ST</option><option value="HV" ${state.venue==='HV'?'selected':''}>跑馬地 HV</option></select>
+        <select id="venue">
+          <option value="ST" ${state.venue==='ST'?'selected':''}>沙田 ST</option>
+          <option value="HV" ${state.venue==='HV'?'selected':''}>跑馬地 HV</option>
+        </select>
       </div>
       <button class="btn primary" id="btnLoad">載入最新賽日</button>`;
     right.innerHTML = `<button class="btn" id="btnOpenHistory">歷史</button><button class="btn accent" id="btnArchive">封存當日</button>`;
   } else if(state.view==='horses'){
     left.innerHTML = `<strong>馬匹清單</strong>`;
+    right.innerHTML = `
+      <button class="btn" id="btnHistory">歷史</button>
+      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>`;
   } else if(state.view==='jockeys'){
     left.innerHTML = `<strong>騎師名單</strong>`;
+    right.innerHTML = `
+      <button class="btn" id="btnHistory">歷史</button>
+      <select id="historyDate" class="btn" style="display:none;margin-left:.4rem;"></select>`;
   } else if(state.view==='trainers'){
     left.innerHTML = `<strong>練馬師名單</strong>`;
   } else if(state.view==='stats'){
@@ -327,14 +352,42 @@ function renderControls(){
     left.innerHTML = `<strong>系統設定</strong>`;
   }
 
+  // === meeting view 控制 ===
   if(state.view==='meeting'){
-    document.getElementById('btnLoad').onclick = async () => { await loadRacesFromServer(); renderMeeting(); };
+    document.getElementById('btnLoad').onclick = async ()=>{
+      await fetchLatestRaceDate();   // 再用最新排位日
+      renderMeetingSummary();
+      renderRaceList();
+      const input = document.getElementById('raceDate');
+      if (input) input.value = state.raceDate;
+    };
     document.getElementById('btnArchive').onclick = archiveToday;
     document.getElementById('btnOpenHistory').onclick = ()=>{ renderHistory(); toggleDrawer(true); };
     document.getElementById('raceDate').onchange = (e)=>{ state.raceDate = e.target.value; renderMeetingSummary(); };
     document.getElementById('venue').onchange = (e)=>{ state.venue = e.target.value; renderMeetingSummary(); };
   }
+
+  // === 馬匹 / 騎師 view 的「歷史」掣 ===
+  if(state.view==='horses' || state.view==='jockeys'){
+    const btn = document.getElementById('btnHistory');
+    const sel = document.getElementById('historyDate');
+    if (btn && sel) {
+      btn.onclick = async () => {
+        if (!sel.options.length) {
+          const dates = await fetchRaceDates();
+          sel.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+        }
+        sel.style.display = sel.style.display === 'none' ? 'inline-block' : 'none';
+      };
+      sel.onchange = () => {
+        const d = sel.value;
+        console.log('[歷史] 選擇日期 =', d);
+        // 之後如果你想：可以根據 d 去 call 馬匹 / 騎師歷史 API
+      };
+    }
+  }
 }
+
 
 /****************************
  * Menu 切換視圖
@@ -493,8 +546,16 @@ function archiveToday(){
 /****************************
  * 初始化
  ****************************/
-renderControls();
-renderView();
+async function init() {
+  // 先向後端問「最新有排位」的 race_date
+  await fetchLatestRaceDate();
+  renderControls();
+  renderView();
+}
+
+// 啟動
+init();
+
 </script>
 </body>
 </html>
