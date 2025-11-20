@@ -57,3 +57,40 @@ tbody tr:hover { background: #f9fafb; }
   .layout { grid-template-columns: 1fr; }
   .sidebar { grid-row: 1; display: none; }
 }
+
+  /* ===== History Modal (全畫面黑 + 中央選擇日期) ===== */
+  .modal-backdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.65);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:80;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{
+    background:var(--panel);
+    border-radius:.9rem;
+    border:1px solid var(--border);
+    padding:1rem 1.2rem;
+    width:min(380px,90vw);
+    box-shadow:0 18px 45px rgba(0,0,0,.65);
+  }
+  .modal header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:.6rem;
+  }
+  .modal-title{font-weight:600;}
+  .modal-body{margin:.4rem 0 .8rem;}
+  .modal-footer{display:flex;justify-content:flex-end;gap:.5rem;}
+  .modal select{
+    width:100%;
+    padding:.45rem .55rem;
+    border-radius:.55rem;
+    border:1px solid var(--border);
+    background:var(--bg);
+    color:var(--text);
+  }

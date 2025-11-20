@@ -91,6 +91,7 @@
     <div class="brand">HKJC 面板</div>
     <nav class="menubar" id="menubar">
       <button class="menu-btn" data-view="meeting" aria-current="page">賽日</button>
+      <button class="menu-btn" id="btnTopHistory" type="button">歷史</button>
       <button class="menu-btn" data-view="horses">馬匹</button>
       <button class="menu-btn" data-view="jockeys">騎師</button>
       <button class="menu-btn" data-view="trainers">練馬師</button>
@@ -211,6 +212,29 @@
   </div>
 </main>
 
+<!-- 🔴 歷史日期選擇彈窗 -->
+<div class="modal-backdrop" id="historyModal">
+  <div class="modal">
+    <header>
+      <div class="modal-title">選擇歷史賽日</div>
+      <button class="btn" type="button" id="btnHistoryClose">✕</button>
+    </header>
+    <div class="modal-body">
+      <p class="muted" style="margin-top:0;margin-bottom:.4rem;">
+        只顯示有排位資料嘅日期：
+      </p>
+      <select id="historyDateSelect">
+        <option value="">載入中…</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" type="button" id="btnHistoryCancel">取消</button>
+      <button class="btn primary" type="button" id="btnHistoryApply">套用</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- 歷史抽屜 -->
 <div class="drawer" id="drawer">
   <header class="row" style="padding:.6rem 1rem"><strong>歷史賽日</strong></header>
@@ -262,23 +286,26 @@ const state = {
 };
 
 // ===== 排位日期 cache / API =====
+// ===== 排位日期 cache / API =====
 let cachedRaceDates = null;
 
-// /api/racecard/dates 會回 [{"2025-11-15T00:00:00.000Z", ...}]
+// 取全部有排位的 race_date（由新到舊）
 async function fetchRaceDates() {
   if (cachedRaceDates) return cachedRaceDates;
   try {
     const res = await fetch('/api/racecard/dates');
     const arr = await res.json();
-    cachedRaceDates = (Array.isArray(arr) ? arr : [])
-      .map(d => typeof d === 'string' ? d.slice(0,10) : '')
-      .filter(Boolean);         // 只保留 YYYY-MM-DD
+    // Render 個 API 返緊 "2025-11-15T00:00:00.000Z" → 食頭 10 字做 YYYY-MM-DD
+    cachedRaceDates = (Array.isArray(arr) ? arr : []).map(d =>
+      typeof d === 'string' ? d.slice(0, 10) : d
+    );
   } catch (e) {
     console.error('fetchRaceDates error', e);
     cachedRaceDates = [];
   }
   return cachedRaceDates;
 }
+
 
 // 取最新一日
 async function fetchLatestRaceDate() {
@@ -461,9 +488,19 @@ function renderControls(){
 el.menubar.addEventListener('click', (e)=>{
   const btn = e.target.closest('.menu-btn');
   if (!btn) return;
-  state.view = btn.dataset.view;
+
+  // ⬇⬇⬇ 忽略頂部「歷史」掣，由 init() 入面另一個 listener 處理
+  if (btn.id === 'btnTopHistory') {
+    return;
+  }
+
+  const view = btn.dataset.view;
+  if (!view) return;      // 冇 view 嘅掣直接無視
+
+  state.view = view;
   renderView();
 });
+
 
 function renderView(){
   [...el.menubar.querySelectorAll('.menu-btn')]
@@ -577,6 +614,38 @@ function renderTrainers(){
 }
 
 /****************************
+ * 歷史 Modal（頂部「歷史」掣用）
+ ****************************/
+const historyModal = document.getElementById('historyModal');
+const historySelect = document.getElementById('historyDateSelect');
+
+function openHistoryModal() {
+  historyModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeHistoryModal() {
+  historyModal.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// 填充有排位的日期選單
+async function populateHistoryDates() {
+  historySelect.innerHTML = `<option value="">載入中…</option>`;
+  const dates = await fetchRaceDates();
+  if (!dates.length) {
+    historySelect.innerHTML = `<option value="">暫時冇歷史賽日</option>`;
+    return;
+  }
+  historySelect.innerHTML = dates
+    .map(d => `<option value="${d}">${d}</option>`)
+    .join('');
+  // 預設揀最新一日（第一個）
+  historySelect.value = dates[0];
+}
+
+
+/****************************
  * 歷史抽屜
  ****************************/
 function toggleDrawer(open){
@@ -643,13 +712,48 @@ async function init() {
     await loadRacesFromServer();
   } catch (e) {
     console.error('init error', e);
-    // 如果後端完全失敗，就用 demo
-    state.races = Array.from({length:12}, (_,i)=> demoRace(i+1));
+    state.races = Array.from({ length: 12 }, (_, i) => demoRace(i + 1));
   }
+
   renderView();
+
+  // ⬇⬇⬇ 在 renderView() 後面加多一段：初始化頂部「歷史」彈窗按鈕
+  const topHistoryBtn = document.getElementById('btnTopHistory');
+  const btnClose = document.getElementById('btnHistoryClose');
+  const btnCancel = document.getElementById('btnHistoryCancel');
+  const btnApply = document.getElementById('btnHistoryApply');
+
+  if (topHistoryBtn) {
+    topHistoryBtn.addEventListener('click', async () => {
+      await populateHistoryDates();  // 讀取全部有排位的 race_date
+      openHistoryModal();            // 開彈窗
+    });
+  }
+
+  if (btnClose) btnClose.addEventListener('click', closeHistoryModal);
+  if (btnCancel) btnCancel.addEventListener('click', closeHistoryModal);
+
+  if (btnApply) {
+    btnApply.addEventListener('click', async () => {
+      const d = document.getElementById('historyDateSelect').value;
+      if (!d) return;
+
+      // 更新賽日
+      state.raceDate = d;
+
+      // 更新 UI 裡的日期 input
+      const dateInput = document.getElementById('raceDate');
+      if (dateInput) dateInput.value = d;
+
+      closeHistoryModal();
+
+      await loadRacesFromServer();  // 重新 load 該日排位
+    });
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
 </script>
 </body>
 </html>
