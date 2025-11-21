@@ -89,15 +89,43 @@
   </section>
 
   <section class="panel" id="panel-runners">
-    <div class="table-wrap">
-      <table class="table" id="runnersTable">
-        <thead><tr>
-          <th>馬號</th><th>馬名（中/英）</th><th>評分</th><th>騎師</th><th>練馬師</th><th>檔位</th>
-        </tr></thead>
-        <tbody></tbody>
-      </table>
-    </div>
+  <div class="table-wrap" style="overflow-x:auto;">
+    <table class="table" id="runnersTable">
+      <thead>
+        <tr>
+          <th>馬號</th>
+          <th>馬名（中）</th>
+          <th>馬名（英）</th>
+          <th>馬匹編號</th>
+          <th>檔位</th>
+          <th>騎師</th>
+          <th>練馬師</th>
+          <th>評分</th>
+          <th>評分變動</th>
+          <th>負磅 (lb)</th>
+          <th>出馬磅</th>
+          <th>年齡</th>
+          <th>性別</th>
+          <th>WFA</th>
+          <th>今季獎金</th>
+          <th>優先權</th>
+          <th>上次出賽至今</th>
+          <th>馬主</th>
+          <th>父系</th>
+          <th>母系</th>
+          <th>進口類別</th>
+          <th>馬衣</th>
+          <th>品牌</th>
+          <th>配備</th>
+          <th>近績</th>
+          <th>退出</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
   </section>
+
 </main>
 
 <script>
@@ -199,22 +227,10 @@ async function loadEntries() {
   const res  = await fetch(url);
   const rows = await res.json();
 
-  state.entries = rows.map(r => ({
-    horse_no:  r.horse_no,
-    draw:      r.draw,
-    name_zh:   r.horse_name_zh || '',
-    name_en:   r.horse_name_en || '',
-    rating:    r.rating ?? '',
-    jockey:    r.jockey_zh || '',
-    trainer:   r.trainer_zh || '',
-    owner:     r.owner || '',
-    age:       r.age ?? '',
-    sex:       r.sex || '',
-    gear:      r.gear || '',
-    last6:     r.last6 || '',
-    scratched: !!r.scratched
-  }));
+  // 直接用 DB column，唔再另起名
+  state.entries = Array.isArray(rows) ? rows : [];
 }
+
 
 // 同步 reload meta + entries
 async function reloadAll() {
@@ -260,25 +276,49 @@ function renderBasic(){
     </div>`;
 }
 
-function renderRunners(){
+function renderRunners() {
   const tbody = document.querySelector('#runnersTable tbody');
   const list  = state.entries;
 
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="6" class="muted">暫時沒有馬匹資料。</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="27" class="muted">暫時沒有馬匹資料。</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = list.map(e => `
-    <tr class="${e.scratched ? 'is-scratched' : ''}">
-      <td>${e.horse_no}</td>
-      <td>${e.name_zh} <span class="muted">/ ${e.name_en || ''}</span></td>
-      <td>${e.rating ?? ''}</td>
-      <td>${e.jockey}</td>
-      <td>${e.trainer}</td>
-      <td>${e.draw}</td>
-    </tr>`).join('');
+  tbody.innerHTML = list.map(e => {
+    const scratched = Number(e.scratched || 0) === 1;
+    return `
+      <tr class="${scratched ? 'is-scratched' : ''}">
+        <td>${e.horse_no ?? ''}</td>
+        <td>${e.horse_name_zh || ''}</td>
+        <td>${e.horse_name_en || ''}</td>
+        <td>${e.horse_code || ''}</td>
+        <td>${e.draw ?? ''}</td>
+        <td>${e.jockey_zh || ''}</td>
+        <td>${e.trainer_zh || ''}</td>
+        <td>${e.rating ?? ''}</td>
+        <td>${e.rating_pm || ''}</td>
+        <td>${e.weight_lb ?? ''}</td>
+        <td>${e.declared_wt ?? ''} ${e.declared_wt_pm || ''}</td>
+        <td>${e.age ?? ''}</td>
+        <td>${e.sex || ''}</td>
+        <td>${e.wfa || ''}</td>
+        <td>${e.season_stakes || ''}</td>
+        <td>${e.priority || ''}</td>
+        <td>${e.days_since || ''}</td>
+        <td>${e.owner || ''}</td>
+        <td>${e.sire || ''}</td>
+        <td>${e.dam || ''}</td>
+        <td>${e.import_cat || ''}</td>
+        <td>${e.silks || ''}</td>
+        <td>${e.brand || ''}</td>
+        <td>${e.gear || ''}</td>
+        <td>${e.last6 || ''}</td>
+        <td>${scratched ? '✅' : ''}</td>
+      </tr>`;
+  }).join('');
 }
+
 
 function renderOdds(){
   const tbody = document.querySelector('#oddsTable tbody');
@@ -297,7 +337,7 @@ function renderOdds(){
     return `
       <tr>
         <td>${e.horse_no}</td>
-        <td>${e.name_zh}</td>
+        <td>${e.horse_name_zh || ''}</td>
         <td>${win}</td>
         <td>${pla}</td>
         <td class="muted">${ts}</td>

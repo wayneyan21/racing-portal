@@ -265,7 +265,7 @@ app.get('/api/racecard/races', requireAuth, async (req, res) => {
 });
 
 
-// 取得某一場所有馬（racecard_entries）
+// 取得某一場所有馬（racecard_entries）— 帶出完整欄位
 app.get('/api/racecard/entries', requireAuth, async (req, res) => {
   try {
     const date = req.query.date;
@@ -276,9 +276,34 @@ app.get('/api/racecard/entries', requireAuth, async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT horse_no, draw, horse_name_zh, horse_name_en,
-              jockey_zh, trainer_zh, rating, rating_pm,
-              declared_wt, owner, age, sex, gear, last6, scratched
+      `SELECT
+         horse_no,
+         horse_name_zh,
+         horse_name_en,
+         horse_code,
+         draw,
+         jockey_zh,
+         trainer_zh,
+         rating,
+         rating_pm,
+         weight_lb,
+         declared_wt,
+         declared_wt_pm,
+         age,
+         sex,
+         wfa,
+         season_stakes,
+         priority,
+         days_since,
+         owner,
+         sire,
+         dam,
+         import_cat,
+         silks,
+         brand,
+         gear,
+         last6,
+         scratched
        FROM racecard_entries
        WHERE race_date = ? AND race_no = ?
        ORDER BY horse_no`,
@@ -287,6 +312,7 @@ app.get('/api/racecard/entries', requireAuth, async (req, res) => {
 
     res.json(rows);
   } catch (e) {
+    console.error('API /racecard/entries error:', e);
     res.status(500).json({ error: e.message });
   }
 });
@@ -304,6 +330,56 @@ app.get('/api/horses', requireAuth, async (_req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// 只用喺「馬匹 → 歷史」度用：按賽日取出當日出賽馬匹
+app.get('/api/horses/by-racedate', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
+  try {
+    const date  = req.query.date;        // YYYY-MM-DD
+    const venue = req.query.venue || ''; // ST / HV，可選
+
+    if (!date) {
+      return res.status(400).json({ error: 'Missing date' });
+    }
+
+    let sql = `
+      SELECT DISTINCT
+        h.horse_id,
+        h.name_chi,
+        h.name_eng,
+        h.sex,
+        h.age,
+        h.colour,
+        h.country,
+        h.trainer_id,
+        h.owner,
+        h.current_rating,
+        h.season_rating,
+        h.last10_racedays,
+        h.updated_at
+      FROM horse_profiles h
+      JOIN racecard_entries e
+        ON e.horse_name_zh = h.name_chi   -- 之後有 horse_id 再改 join condition
+      WHERE e.race_date = ?
+    `;
+    const params = [date];
+
+    if (venue) {
+      sql += ' AND e.venue_code = ?';
+      params.push(venue);
+    }
+
+    sql += ' ORDER BY h.current_rating DESC, h.horse_id';
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (e) {
+    console.error('🐎 /api/horses/by-racedate error:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 
 // 🔍 搜尋馬匹（支援中英文）
 app.get('/api/horses/search', requireAuth, async (req, res) => {
