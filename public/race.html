@@ -42,9 +42,11 @@
   .kv{display:grid;grid-template-columns:120px 1fr;gap:.35rem .6rem}
   .kv div{padding:.15rem 0;border-bottom:1px dashed var(--border)}
 
+
+  .table-wrap {background: var(--panel);border: 1px solid var(--border);border-radius: .8rem;overflow-x: auto;overflow-y: hidden}
+  .table th, .table td {white-space: nowrap;overflow: hidden;text-overflow: ellipsis}
   .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:.8rem;overflow:hidden}
   .table{width:100%;border-collapse:collapse}
-  .table th,.table td{border-bottom:1px solid var(--border);padding:.55rem .4rem;text-align:left}
   .table th{color:var(--muted);font-weight:600}
 
   @media (max-width:600px){
