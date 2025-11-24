@@ -66,32 +66,41 @@ HKT = timezone(timedelta(hours=8))
 
 # ---------- DB 連線設定（跟 server.js 一樣用 env） ----------
 
-import pymysql
+def get_db_cfg():
+    """
+    同 server.js 一樣，由環境變數攞 MySQL 設定：
+      DB_HOST / DB_PORT / DB_USER / DB_PASS / DB_NAME
+    """
+    return {
+        "host": os.getenv("DB_HOST", "127.0.0.1"),
+        "port": int(os.getenv("DB_PORT", "3306")),
+        "user": os.getenv("DB_USER", "root"),
+        "password": os.getenv("DB_PASS", ""),
+        "database": os.getenv("DB_NAME", "hkjc_db"),
+    }
+
 
 def get_conn():
-    # 👉 本機 MySQL 設定：記得改成你自己真實資料
-    host = "hkjc-db.ccdsakuk6778.us-east-1.rds.amazonaws.com"
-    user = "waynelam"
-    password = "9p3Xls7uapBp5JSzMvK6"
-    database = "hkjc_db"   # 或者 hkjc
-    port = 3306
+    cfg = get_db_cfg()
 
+    # optional：debug 用，方便睇 Render log（唔會 print 密碼）
     print("DB config =>", {
-        "host": host,
-        "port": port,
-        "user": user,
-        "database": database,
+        "host": cfg["host"],
+        "port": cfg["port"],
+        "user": cfg["user"],
+        "database": cfg["database"],
     })
 
     return pymysql.connect(
-        host=host,
-        port=port,
-        user=user,
-        password=password,
-        database=database,
+        host=cfg["host"],
+        port=cfg["port"],
+        user=cfg["user"],
+        password=cfg["password"],
+        database=cfg["database"],
         charset="utf8mb4",
         cursorclass=pymysql.cursors.DictCursor,
     )
+
 
 
 # ---------- GraphQL 取數據 ----------
@@ -125,7 +134,7 @@ def fetch_odds(date_str: str, venue_code: str, race_no: int,
 
 
 def save_raw_json(data: dict, date_str: str, venue_code: str, race_no: int):
-    out_dir = Path("racing-portal/public/graphql_raw")
+    out_dir = Path("../public/graphql_raw")
     out_dir.mkdir(exist_ok=True)
     fn = out_dir / f"odds_{date_str}_{venue_code}_R{race_no}.json"
     with fn.open("w", encoding="utf-8") as f:
