@@ -50,19 +50,41 @@ def fetch_upcoming_races():
 
 def should_fetch_for_race(now_hkt: datetime, race_row: dict) -> bool:
     race_date = race_row["race_date"]       # DATE
-    race_time_val = race_row["race_time"]   # TIME
+    race_time_val = race_row["race_time"]   # TIME (PyMySQL → timedelta)
     race_no = race_row["race_no"]
     venue_code = race_row["venue_code"]
 
-    # race_date + race_time -> 開跑 datetime（HKT）
-    if isinstance(race_time_val, time):
-        race_dt = datetime.combine(race_date, race_time_val, tzinfo=HKT)
-    else:
-        # 若 DB 給 DATETIME 亦可兼容
-        race_dt = race_time_val
-        if race_dt.tzinfo is None:
-            race_dt = race_dt.replace(tzinfo=HKT)
+    # --- 將 race_date + race_time 變成 HKT datetime ---
+    if isinstance(race_time_val, timedelta):
+        # MySQL TIME 由 PyMySQL 變成 timedelta，轉返去 hour/minute
+        total_sec = int(race_time_val.total_seconds())
+        hh = (total_sec // 3600) % 24
+        mm = (total_sec % 3600) // 60
+        race_dt = datetime.combine(race_date, time(hour=hh, minute=mm), tzinfo=HKT)
 
+    elif isinstance(race_time_val, time):
+        race_dt = datetime.combine(race_date, race_time_val, tzinfo=HKT)
+
+    else:
+        # 若 DB 給 DATETIME / 字串 等其他型態
+        race_dt = race_time_val
+        if isinstance(race_dt, str):
+            # 預期格式 'HH:MM:SS' 或 'HH:MM'
+            try:
+                hh, mm = race_dt.split(":")[:2]
+                race_dt = datetime.combine(
+                    race_date,
+                    time(hour=int(hh), minute=int(mm)),
+                    tzinfo=HKT,
+                )
+            except Exception:
+                # 撞到奇怪格式就直接唔 fetch，避免爆錯
+                return False
+        else:
+            if race_dt.tzinfo is None:
+                race_dt = race_dt.replace(tzinfo=HKT)
+
+    # --- 關注時間邏輯 ---
     # 開始關注時間：比賽日的前一日 13:00 (HKT)
     start_track = datetime.combine(
         race_date - timedelta(days=1),
