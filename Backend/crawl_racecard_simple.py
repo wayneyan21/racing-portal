@@ -606,6 +606,7 @@ def crawl_meeting(auto_date: Optional[str],
         opts.add_argument("--headless=new")
     opts.add_argument("--disable-gpu")
     opts.add_argument("--no-sandbox")
+    opts.add_argument("--disable-dev-shm-usage")  # ⭐ Render / Docker 必加
     opts.add_argument("--lang=zh-HK")
     opts.add_argument("--window-size=1280,2200")
     opts.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36")
