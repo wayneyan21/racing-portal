@@ -1,0 +1,246 @@
+{
+  "data": {
+    "raceMeetings": [
+      {
+        "pmPools": [
+          {
+            "id": "MTG_20251123_0001PLA10",
+            "status": "START_SELL",
+            "sellStatus": "START_SELL",
+            "oddsType": "PLA",
+            "lastUpdateTime": "2025-11-22T13:06:51.611+08:00",
+            "guarantee": null,
+            "minTicketCost": 0,
+            "name_en": null,
+            "name_ch": null,
+            "leg": {
+              "number": 10,
+              "races": [
+                10
+              ]
+            },
+            "cWinSelections": [],
+            "oddsNodes": [
+              {
+                "combString": "01",
+                "oddsValue": "3.0",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "02",
+                "oddsValue": "6.3",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "03",
+                "oddsValue": "3.1",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "04",
+                "oddsValue": "3.3",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "05",
+                "oddsValue": "4.4",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "06",
+                "oddsValue": "7.0",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "07",
+                "oddsValue": "10",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "08",
+                "oddsValue": "2.2",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "09",
+                "oddsValue": "10",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "10",
+                "oddsValue": "4.0",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "11",
+                "oddsValue": "9.4",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "12",
+                "oddsValue": "6.9",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "13",
+                "oddsValue": "1.9",
+                "hotFavourite": true,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "14",
+                "oddsValue": "2.0",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              }
+            ]
+          },
+          {
+            "id": "MTG_20251123_0001WIN10",
+            "status": "START_SELL",
+            "sellStatus": "START_SELL",
+            "oddsType": "WIN",
+            "lastUpdateTime": "2025-11-22T13:06:51.603+08:00",
+            "guarantee": null,
+            "minTicketCost": 0,
+            "name_en": null,
+            "name_ch": null,
+            "leg": {
+              "number": 10,
+              "races": [
+                10
+              ]
+            },
+            "cWinSelections": [],
+            "oddsNodes": [
+              {
+                "combString": "01",
+                "oddsValue": "7.8",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "02",
+                "oddsValue": "9.5",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "03",
+                "oddsValue": "9.3",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "04",
+                "oddsValue": "5.5",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "05",
+                "oddsValue": "17",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "06",
+                "oddsValue": "23",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "07",
+                "oddsValue": "58",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "08",
+                "oddsValue": "7.3",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "09",
+                "oddsValue": "28",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "10",
+                "oddsValue": "26",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "11",
+                "oddsValue": "30",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "12",
+                "oddsValue": "21",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "13",
+                "oddsValue": "10",
+                "hotFavourite": false,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              },
+              {
+                "combString": "14",
+                "oddsValue": "5.2",
+                "hotFavourite": true,
+                "oddsDropValue": 0,
+                "bankerOdds": []
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

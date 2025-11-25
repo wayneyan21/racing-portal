@@ -179,20 +179,18 @@ def build_odds_map(data: dict):
     return odds_map, meeting
 
 
+
 # ---------- 寫入 MySQL：最新 + 歷史 ----------
 
 def update_mysql_odds(date_str: str, venue_code: str, race_no: int,
                       odds_map: dict):
-    """
-    odds_map: {horse_no: {'WIN': x, 'PLA': y}}
+    print("DEBUG odds_map:", odds_map)          # ⬅️ 新加
+    print("DEBUG len:", len(odds_map))          # ⬅️ 新加
 
-    - 更新 racecard_entries.win_odds / pla_odds / last_odds_update
-      依賴 UNIQUE KEY (race_date, race_no, horse_no)
-    - 如 odds 有變，插入一行到 race_odds_snapshots
-    """
     if not odds_map:
         print("⚠️ odds_map 為空，無需寫入 DB")
         return
+
 
     now_ts = datetime.now(tz=HKT).replace(tzinfo=None)  # 存 DATETIME，不帶 tz
     conn = get_conn()

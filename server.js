@@ -317,6 +317,72 @@ app.get('/api/racecard/entries', requireAuth, async (req, res) => {
   }
 });
 
+// 🔹 賠率 API：回傳最新賠率 + 最近 10 筆 snapshot
+// GET /api/odds?date=2025-11-26&venue=HV&raceNo=1
+app.get('/api/odds', requireAuth, async (req, res) => {
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
+
+  try {
+    const { date, venue, raceNo } = req.query;
+
+    if (!date || !venue || !raceNo) {
+      return res.status(400).json({ error: 'missing date / venue / raceNo' });
+    }
+
+    const conn = await pool.getConnection();
+
+    try {
+      // 1) 最新賠率：來自 racecard_entries
+      const [latestRows] = await conn.execute(
+        `
+        SELECT
+          horse_no,
+          horse_name_zh,
+          win_odds,
+          pla_odds,
+          last_odds_update
+        FROM racecard_entries
+        WHERE race_date = ?
+          AND race_no   = ?
+        ORDER BY horse_no
+        `,
+        [date, raceNo]
+      );
+
+      // 2) 最近 10 筆 snapshot：來自 race_odds_snapshots
+      const [snapRows] = await conn.execute(
+        `
+        SELECT
+          horse_no,
+          odds_type,
+          odds,
+          snapshot_ts
+        FROM race_odds_snapshots
+        WHERE race_date = ?
+          AND venue_code = ?
+          AND race_no    = ?
+        ORDER BY snapshot_ts DESC
+        LIMIT 10
+        `,
+        [date, venue, raceNo]
+      );
+
+      conn.release();
+
+      return res.json({
+        latest: latestRows,
+        snapshots: snapRows,
+      });
+    } catch (e) {
+      conn.release();
+      throw e;
+    }
+  } catch (e) {
+    console.error('API /api/odds error:', e);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
 
 // 取得馬匹資料（最簡版）
 app.get('/api/horses', requireAuth, async (_req, res) => {
