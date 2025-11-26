@@ -55,6 +55,16 @@
     .kv{grid-template-columns:1fr}
     .table-wrap{overflow-x:auto}
   }
+    .odds-grid-wrapper{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+    gap:.8rem;
+    margin-top:1rem;
+  }
+  .odds-grid h4{font-size:14px}
+  .table td.odds-empty{color:var(--muted);font-size:12px}
+  .table td.odds-cell small{display:block;font-size:11px;color:var(--muted)}
+
 </style>
 </head>
 <body>
@@ -83,42 +93,81 @@
 
   <!-- 賠率 panel：上面最新賠率，下面最近 10 筆 snapshot -->
   <section class="panel" id="panel-odds">
-    <h3 class="section-title">
-      最新賠率<span class="pill" id="oddsSummaryPill">載入中…</span>
-    </h3>
-    <div class="table-wrap">
-      <table class="table" id="oddsTable">
-        <thead>
-          <tr>
-            <th>馬號</th>
-            <th>馬名</th>
-            <th>獨贏</th>
-            <th>位置</th>
-            <th>最後更新</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+  <!-- 最新賠率（racecard_entries.win_odds / pla_odds） -->
+  <h3 style="margin:0 0 .4rem;">最新賠率</h3>
+  <div class="table-wrap">
+    <table class="table" id="oddsLiveTable">
+      <thead>
+        <tr>
+          <th>馬號</th>
+          <th>馬名</th>
+          <th>獨贏</th>
+          <th>位置</th>
+          <th class="muted">最後更新</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <!-- 歷史賠率：WIN / PLA 各一個 grid table -->
+  <div class="odds-grid-wrapper">
+    <div class="odds-grid">
+      <h4 style="margin:.8rem 0 .3rem;">獨贏最近 10 筆</h4>
+      <div class="table-wrap">
+        <table class="table" id="oddsHistWIN">
+          <thead>
+            <tr>
+              <th>馬號</th>
+              <th>馬名</th>
+              <th>1</th>
+              <th>2</th>
+              <th>3</th>
+              <th>4</th>
+              <th>5</th>
+              <th>6</th>
+              <th>7</th>
+              <th>8</th>
+              <th>9</th>
+              <th>10</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
 
-    <h3 class="section-title" style="margin-top:1.1rem;">
-      最近 10 筆賠率變動
-    </h3>
-    <div class="table-wrap">
-      <table class="table" id="oddsSnapshotsTable">
-        <thead>
-          <tr>
-            <th>時間</th>
-            <th>馬號</th>
-            <th>馬名</th>
-            <th>投注類別</th>
-            <th>賠率</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+    <div class="odds-grid">
+      <h4 style="margin:.8rem 0 .3rem;">位置最近 10 筆</h4>
+      <div class="table-wrap">
+        <table class="table" id="oddsHistPLA">
+          <thead>
+            <tr>
+              <th>馬號</th>
+              <th>馬名</th>
+              <th>1</th>
+              <th>2</th>
+              <th>3</th>
+              <th>4</th>
+              <th>5</th>
+              <th>6</th>
+              <th>7</th>
+              <th>8</th>
+              <th>9</th>
+              <th>10</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
-  </section>
+  </div>
+
+  <p class="muted" style="margin-top:.4rem;font-size:12px;">
+    每格顯示最新 → 較舊賠率，滑鼠移上去可睇時間；頁面會定時自動重新整理。
+  </p>
+</section>
+
 
   <section class="panel" id="panel-runners">
     <div class="table-wrap" style="overflow-x:auto;">
@@ -180,10 +229,12 @@ document.getElementById('title-sub').textContent =
 // =========================
 const state = {
   tab: 'basic',
-  raceMeta: null,         // racecard_races 一行
-  entries: [],            // racecard_entries 多行
-  oddsLatest: [],         // /api/odds.latest
-  oddsSnapshots: []       // /api/odds.snapshots（最近 10 筆）
+  raceMeta: null,
+  entries: [],
+  oddsHistory: {
+    WIN: {}, // {horse_no: [{odds, ts}, ...]}
+    PLA: {}
+  }
 };
 
 // =========================
@@ -264,29 +315,121 @@ async function loadEntries() {
   state.entries = Array.isArray(rows) ? rows : [];
 }
 
-// 5.3 賠率（最新 + snapshot）
-async function loadOdds() {
-  const url = `/api/odds?date=${raceDate}&venue=${venue}&raceNo=${raceNo}`;
-  console.log('[race] fetch odds:', url);
+// 5.3 取某場 WIN / PLA 賠率歷史（每匹馬由新到舊）
+async function loadOddsHistory(type) {
+  const url =
+    `/api/odds/history?date=${raceDate}&venue=${venue}&race_no=${raceNo}&type=${type}`;
+  console.log('[race] fetch odds history:', type, url);
 
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('odds api error ' + res.status);
-    const data = await res.json();
+  const res  = await fetch(url);
+  const rows = await res.json();
 
-    state.oddsLatest    = Array.isArray(data.latest)    ? data.latest    : [];
-    state.oddsSnapshots = Array.isArray(data.snapshots) ? data.snapshots : [];
-  } catch (e) {
-    console.error('[race] loadOdds error:', e);
-    state.oddsLatest = [];
-    state.oddsSnapshots = [];
-  }
+  const map = {};
+  (rows || []).forEach(r => {
+    const no = r.horse_no;
+    if (!map[no]) map[no] = [];
+    if (map[no].length < 10) {
+      map[no].push({
+        odds: r.odds,
+        ts: r.snapshot_ts
+      });
+    }
+  });
+
+  state.oddsHistory[type] = map;
 }
+
+async function loadAllOddsHistory() {
+  await Promise.all([
+    loadOddsHistory('WIN'),
+    loadOddsHistory('PLA')
+  ]);
+}
+
+
+function renderOddsLive() {
+  const tbody = document.querySelector('#oddsLiveTable tbody');
+  const list  = state.entries || [];
+
+  if (!list.length) {
+    tbody.innerHTML =
+      `<tr><td colspan="5" class="muted">暫時沒有賠率資料。</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = list.map(e => {
+    const win = e.win_odds != null ? Number(e.win_odds).toFixed(2) : '-';
+    const pla = e.pla_odds != null ? Number(e.pla_odds).toFixed(2) : '-';
+    let ts   = '';
+    if (e.last_odds_update) {
+      const d = new Date(e.last_odds_update);
+      ts = isNaN(d.getTime()) ? String(e.last_odds_update) : d.toLocaleTimeString();
+    }
+
+    return `
+      <tr>
+        <td>${e.horse_no}</td>
+        <td>${e.horse_name_zh || ''}</td>
+        <td>${win}</td>
+        <td>${pla}</td>
+        <td class="muted">${ts || '-'}</td>
+      </tr>`;
+  }).join('');
+}
+
+function renderOddsHistoryTable(type, tableId) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  const entries = state.entries || [];
+  const histMap = state.oddsHistory[type] || {};
+  if (!entries.length) {
+    tbody.innerHTML =
+      `<tr><td colspan="12" class="muted">暫時沒有賠率變動。</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = entries.map(e => {
+    const no   = e.horse_no;
+    const name = e.horse_name_zh || '';
+    const arr  = histMap[no] || [];
+
+    const cells = [];
+    for (let i = 0; i < 10; i++) {
+      const rec = arr[i];
+      if (!rec) {
+        cells.push('<td class="odds-empty">-</td>');
+      } else {
+        const t = new Date(rec.ts);
+        const ts = isNaN(t.getTime()) ? rec.ts : t.toLocaleTimeString();
+        cells.push(
+          `<td class="odds-cell" title="${ts}">${Number(rec.odds).toFixed(2)}</td>`
+        );
+      }
+    }
+
+    return `
+      <tr>
+        <td>${no}</td>
+        <td>${name}</td>
+        ${cells.join('')}
+      </tr>`;
+  }).join('');
+}
+
+function renderOdds(){
+  renderOddsLive();
+  renderOddsHistoryTable('WIN', 'oddsHistWIN');
+  renderOddsHistoryTable('PLA', 'oddsHistPLA');
+}
+
 
 // 同步 reload meta + entries + odds
 async function reloadAll() {
   try {
-    await Promise.all([loadRaceMeta(), loadEntries(), loadOdds()]);
+    await Promise.all([
+      loadRaceMeta(),
+      loadEntries(),
+      loadAllOddsHistory()
+    ]);
   } catch (err) {
     console.error('[race] reload error', err);
   }
@@ -392,81 +535,32 @@ function renderRunners() {
   }).join('');
 }
 
-// 7.3 賠率 render
-function renderOdds(){
-  const tbodyLatest = document.querySelector('#oddsTable tbody');
-  const tbodySnaps  = document.querySelector('#oddsSnapshotsTable tbody');
-  const pill        = document.getElementById('oddsSummaryPill');
-
-  const latest = state.oddsLatest || [];
-  const snaps  = state.oddsSnapshots || [];
-
-  if (!latest.length){
-    tbodyLatest.innerHTML =
-      `<tr><td colspan="5" class="muted">暫時沒有賠率資料（可能未開售或 scheduler 未更新）。</td></tr>`;
-    pill.textContent = '尚未有賠率';
-  } else {
-    // 以馬號排序
-    const sorted = [...latest].sort((a,b)=>(a.horse_no||0)-(b.horse_no||0));
-    tbodyLatest.innerHTML = sorted.map(e => {
-      const win = (e.win_odds ?? '').toString();
-      const pla = (e.pla_odds ?? '').toString();
-      const ts  = fmtTime(e.last_odds_update);
-      return `
-        <tr>
-          <td>${e.horse_no}</td>
-          <td>${e.horse_name_zh || ''}</td>
-          <td>${win}</td>
-          <td>${pla}</td>
-          <td class="muted">${ts}</td>
-        </tr>`;
-    }).join('');
-
-    const lastTs = sorted.reduce((acc,e)=>{
-      if (!e.last_odds_update) return acc;
-      const d = new Date(e.last_odds_update);
-      if (Number.isNaN(d.getTime())) return acc;
-      return (!acc || d>acc) ? d : acc;
-    }, null);
-
-    pill.textContent = lastTs
-      ? `最後更新：${lastTs.toLocaleTimeString('zh-HK',{hour12:false})}`
-      : '已載入';
-  }
-
-  // Snapshots：最近 10 筆
-  if (!snaps.length){
-    tbodySnaps.innerHTML =
-      `<tr><td colspan="5" class="muted">暫時沒有 snapshot 記錄。</td></tr>`;
-  } else {
-    const nameMap = buildHorseNameMap();
-    const sortedSnaps = [...snaps].sort(
-      (a,b)=>new Date(b.snapshot_ts)-new Date(a.snapshot_ts)
-    );
-
-    tbodySnaps.innerHTML = sortedSnaps.map(s => {
-      const ts = fmtTime(s.snapshot_ts);
-      const horseNo = s.horse_no ?? '';
-      const name = nameMap[horseNo] || '';
-      const type = s.odds_type || '';
-      const odds = s.odds ?? '';
-      return `
-        <tr>
-          <td>${ts}</td>
-          <td>${horseNo}</td>
-          <td>${name}</td>
-          <td>${type}</td>
-          <td>${odds}</td>
-        </tr>`;
-    }).join('');
-  }
-}
-
 function renderCurrentTab(){
   if (state.tab === 'basic')   renderBasic();
   if (state.tab === 'odds')    renderOdds();
   if (state.tab === 'runners') renderRunners();
 }
+
+// =========================
+// 8. 自動更新（例如每 30 秒）
+// =========================
+let autoTimer = setInterval(async () => {
+  try {
+    // 重新拉最新 win_odds / pla_odds + 10 筆 snapshot
+    await Promise.all([
+      loadEntries(),
+      loadAllOddsHistory()
+    ]);
+
+    // 如果而家正喺賠率 tab，就即刻重畫
+    if (state.tab === 'odds') {
+      renderOdds();
+    }
+  } catch (e) {
+    console.error('[auto-refresh] error', e);
+  }
+}, 30 * 1000); // 30 秒一次
+
 
 // =========================
 // 8. 初始化
