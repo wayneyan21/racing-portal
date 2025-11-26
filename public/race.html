@@ -64,6 +64,16 @@
   .odds-grid h4{font-size:14px}
   .table td.odds-empty{color:var(--muted);font-size:12px}
   .table td.odds-cell small{display:block;font-size:11px;color:var(--muted)}
+    .odds-cell-hot{
+    color:#ff6b6b;
+    font-weight:600;
+  }
+  .odds-cell-warm{
+    color:#ffb347;
+    font-weight:600;
+  }
+
+
 
 </style>
 </head>
@@ -315,28 +325,39 @@ async function loadEntries() {
   state.entries = Array.isArray(rows) ? rows : [];
 }
 
-// 5.3 取某場 WIN / PLA 賠率歷史（每匹馬由新到舊）
+// 5.3 取某場 WIN / PLA 賠率歷史（每類型，按時間切 10 個 column）
 async function loadOddsHistory(type) {
   const url =
     `/api/odds/history?date=${raceDate}&venue=${venue}&race_no=${raceNo}&type=${type}`;
   console.log('[race] fetch odds history:', type, url);
 
   const res  = await fetch(url);
-  const rows = await res.json();
+  const rows = await res.json(); // rows: [{horse_no, odds, snapshot_ts}, ...] 新→舊
 
-  const map = {};
-  (rows || []).forEach(r => {
-    const no = r.horse_no;
-    if (!map[no]) map[no] = [];
-    if (map[no].length < 10) {
-      map[no].push({
-        odds: r.odds,
-        ts: r.snapshot_ts
-      });
+  const timeKeys = [];
+  const byHorse = {}; // {horse_no: { tsKey: odds }}
+
+  for (const r of rows || []) {
+    const tsKey = r.snapshot_ts;
+    // 收集最多 10 個「不同 snapshot_ts」
+    if (!timeKeys.includes(tsKey)) {
+      if (timeKeys.length >= 10) {
+        // 已經超過 10 個時間，就唔再理更舊嗰啲
+        continue;
+      }
+      timeKeys.push(tsKey);
     }
-  });
 
-  state.oddsHistory[type] = map;
+    const no = r.horse_no;
+    if (!byHorse[no]) byHorse[no] = {};
+    byHorse[no][tsKey] = r.odds;
+  }
+
+  // 儲起：每個 type 一套 {times, byHorse}
+  state.oddsHistory[type] = {
+    times: timeKeys,   // 由新到舊嘅 snapshot_ts
+    byHorse: byHorse
+  };
 }
 
 async function loadAllOddsHistory() {
@@ -377,33 +398,92 @@ function renderOddsLive() {
   }).join('');
 }
 
+// helper：時間格式
+function fmtTime(ts){
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return ts;
+  return d.toLocaleTimeString('zh-HK', { hour12:false });
+}
+
+// 生成某個類型（WIN / PLA）嘅歷史表
 function renderOddsHistoryTable(type, tableId) {
   const tbody = document.querySelector(`#${tableId} tbody`);
+  const table = document.getElementById(tableId);
   const entries = state.entries || [];
-  const histMap = state.oddsHistory[type] || {};
-  if (!entries.length) {
+  const hist    = state.oddsHistory[type] || {};
+  const times   = hist.times || [];
+  const byHorse = hist.byHorse || {};
+
+  if (!entries.length || !times.length) {
     tbody.innerHTML =
       `<tr><td colspan="12" class="muted">暫時沒有賠率變動。</td></tr>`;
+    // 頭頂 th 仍然保留原本 1..10 唔緊要
     return;
   }
 
+  // 1) 更新表頭：第 3 格開始改成時間
+  const ths = table.querySelectorAll('thead tr th');
+  for (let i = 0; i < 10; i++) {
+    const tsKey = times[i];
+    const label = tsKey ? fmtTime(tsKey) : (i + 1);
+    if (ths[2 + i]) ths[2 + i].textContent = label;
+  }
+
+  // 2) 為每一個時間，計算「最熱」「次熱」馬（即賠率最細、第二細）
+  const hotMap = {}; // { tsKey: { first:no, second:no } }
+
+  for (const tsKey of times) {
+    let best1 = null; // {no, odds}
+    let best2 = null;
+
+    for (const e of entries) {
+      const no = e.horse_no;
+      const v  = byHorse[no] ? byHorse[no][tsKey] : null;
+      if (v == null) continue;
+      const val = Number(v);
+      if (!isFinite(val)) continue;
+
+      if (!best1 || val < best1.odds) {
+        best2 = best1;
+        best1 = { no, odds: val };
+      } else if (!best2 || val < best2.odds) {
+        best2 = { no, odds: val };
+      }
+    }
+
+    hotMap[tsKey] = {
+      first:  best1 ? best1.no  : null,
+      second: best2 ? best2.no  : null
+    };
+  }
+
+  // 3) 逐馬畫行：左邊係馬號＋馬名，右邊 10 格按時間排
   tbody.innerHTML = entries.map(e => {
     const no   = e.horse_no;
     const name = e.horse_name_zh || '';
-    const arr  = histMap[no] || [];
 
-    const cells = [];
-    for (let i = 0; i < 10; i++) {
-      const rec = arr[i];
-      if (!rec) {
-        cells.push('<td class="odds-empty">-</td>');
-      } else {
-        const t = new Date(rec.ts);
-        const ts = isNaN(t.getTime()) ? rec.ts : t.toLocaleTimeString();
-        cells.push(
-          `<td class="odds-cell" title="${ts}">${Number(rec.odds).toFixed(2)}</td>`
-        );
+    const cells = times.map(tsKey => {
+      const v = byHorse[no] ? byHorse[no][tsKey] : null;
+      if (v == null) return `<td class="odds-empty">-</td>`;
+
+      const val = Number(v);
+      const tsLabel = fmtTime(tsKey);
+      const hotInfo = hotMap[tsKey] || {};
+      let cls = 'odds-cell';
+
+      if (hotInfo.first === no) {
+        cls += ' odds-cell-hot';   // 最熱：紅色
+      } else if (hotInfo.second === no) {
+        cls += ' odds-cell-warm';  // 第二熱：橙色
       }
+
+      return `<td class="${cls}" title="${tsLabel}">${val.toFixed(2)}</td>`;
+    });
+
+    // 如果 times 少於 10 個，用空格補到 10
+    for (let i = times.length; i < 10; i++) {
+      cells.push('<td class="odds-empty">-</td>');
     }
 
     return `
@@ -415,11 +495,13 @@ function renderOddsHistoryTable(type, tableId) {
   }).join('');
 }
 
+// 整體賠率 panel render
 function renderOdds(){
-  renderOddsLive();
-  renderOddsHistoryTable('WIN', 'oddsHistWIN');
-  renderOddsHistoryTable('PLA', 'oddsHistPLA');
+  renderOddsLive();                             // 上面嗰行「最新賠率」
+  renderOddsHistoryTable('WIN', 'oddsHistWIN'); // 左邊：獨贏
+  renderOddsHistoryTable('PLA', 'oddsHistPLA'); // 右邊：位置
 }
+
 
 
 // 同步 reload meta + entries + odds
@@ -559,7 +641,7 @@ let autoTimer = setInterval(async () => {
   } catch (e) {
     console.error('[auto-refresh] error', e);
   }
-}, 30 * 1000); // 30 秒一次
+}, 10 * 1000); // 10 秒一次
 
 
 // =========================

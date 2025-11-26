@@ -184,13 +184,17 @@ def build_odds_map(data: dict):
 
 def update_mysql_odds(date_str: str, venue_code: str, race_no: int,
                       odds_map: dict):
-    print("DEBUG odds_map:", odds_map)          # ⬅️ 新加
-    print("DEBUG len:", len(odds_map))          # ⬅️ 新加
+    """
+    odds_map: {horse_no: {'WIN': x, 'PLA': y}}
 
+    - 更新 racecard_entries.win_odds / pla_odds / last_odds_update
+      依賴 UNIQUE KEY (race_date, race_no, horse_no)
+    - 不論賠率有冇變，都插入一行到 race_odds_snapshots
+      （方便你之後每一個時間都有完整盤口）
+    """
     if not odds_map:
         print("⚠️ odds_map 為空，無需寫入 DB")
         return
-
 
     now_ts = datetime.now(tz=HKT).replace(tzinfo=None)  # 存 DATETIME，不帶 tz
     conn = get_conn()
@@ -225,53 +229,33 @@ def update_mysql_odds(date_str: str, venue_code: str, race_no: int,
                 ))
                 updated_latest += 1
 
-                # 2) 歷史 snapshot — WIN / PLA 各自檢查一次
+                # 2) 歷史 snapshot — 依家永遠寫入一筆（WIN / PLA 各一筆）
                 for odds_type, odds_val in odds_by_type.items():
                     if odds_val is None:
                         continue
 
-                    sql_last = """
-                    SELECT odds
-                    FROM race_odds_snapshots
-                    WHERE race_date = %s AND venue_code = %s
-                      AND race_no = %s AND horse_no = %s
-                      AND odds_type = %s
-                    ORDER BY snapshot_ts DESC
-                    LIMIT 1
+                    sql_snap = """
+                    INSERT INTO race_odds_snapshots
+                      (race_date, venue_code, race_no,
+                       horse_no, odds_type, odds, snapshot_ts)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)
                     """
-                    cur.execute(sql_last, (
+                    cur.execute(sql_snap, (
                         date_str,
                         venue_code,
                         race_no,
                         horse_no,
                         odds_type,
+                        odds_val,
+                        now_ts,
                     ))
-                    row = cur.fetchone()
-                    last_odds = float(row["odds"]) if row and row["odds"] is not None else None
-                    this_odds = float(odds_val)
-
-                    if last_odds is None or this_odds != last_odds:
-                        sql_snap = """
-                        INSERT INTO race_odds_snapshots
-                          (race_date, venue_code, race_no,
-                           horse_no, odds_type, odds, snapshot_ts)
-                        VALUES (%s,%s,%s,%s,%s,%s,%s)
-                        """
-                        cur.execute(sql_snap, (
-                            date_str,
-                            venue_code,
-                            race_no,
-                            horse_no,
-                            odds_type,
-                            odds_val,
-                            now_ts,
-                        ))
-                        inserted_snapshots += 1
+                    inserted_snapshots += 1
 
         conn.commit()
         print(f"✅ 最新賠率已更新 {updated_latest} 匹馬，新增 snapshot {inserted_snapshots} 行")
     finally:
         conn.close()
+
 
 
 # ---------- console 摘要（方便你睇） ----------

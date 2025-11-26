@@ -264,53 +264,37 @@ app.get('/api/racecard/races', requireAuth, async (req, res) => {
   }
 });
 
-// 賠率歷史：每匹馬最近 10 筆（WIN / PLA 各自一個表）
+// 取得某一場某類型賠率的歷史 snapshot（由新至舊）
 app.get('/api/odds/history', requireAuth, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'DB not ready' });
 
   try {
     const date   = req.query.date;
     const venue  = req.query.venue;
-    const raceNo = Number(req.query.race_no || req.query.race || 0);
-    const type   = (req.query.type || 'WIN').toUpperCase(); // 'WIN' or 'PLA'
+    const raceNo = req.query.race_no;
+    const type   = (req.query.type || 'WIN').toUpperCase(); // WIN / PLA
 
-    if (!date || !venue || !raceNo || !['WIN', 'PLA'].includes(type)) {
-      return res.status(400).json({ error: 'Missing or invalid params' });
+    if (!date || !venue || !raceNo) {
+      return res.status(400).json({ error: 'Missing date / venue / race_no' });
     }
 
-    // 取出每匹馬由新到舊嘅 snapshot（之後前端 group，最多顯示 10 筆）
+    const oddsType = type === 'PLA' ? 'PLA' : 'WIN';
+
     const [rows] = await pool.query(
-      `
-      SELECT
-        s.horse_no,
-        e.horse_name_zh,
-        s.odds_type,
-        s.odds,
-        s.snapshot_ts
-      FROM race_odds_snapshots s
-      JOIN racecard_entries e
-        ON e.race_date = s.race_date
-       AND e.race_no   = s.race_no
-       AND e.horse_no  = s.horse_no
-      WHERE
-        s.race_date = ?
-        AND s.venue_code = ?
-        AND s.race_no = ?
-        AND s.odds_type = ?
-      ORDER BY
-        s.horse_no ASC,
-        s.snapshot_ts DESC
-      `,
-      [date, venue, raceNo, type]
+      `SELECT horse_no, odds, snapshot_ts
+       FROM race_odds_snapshots
+       WHERE race_date = ? AND venue_code = ? AND race_no = ? AND odds_type = ?
+       ORDER BY snapshot_ts DESC, horse_no ASC
+       LIMIT 1000`,
+      [date, venue, raceNo, oddsType]
     );
 
     res.json(rows);
   } catch (e) {
-    console.error('API /api/odds/history error:', e);
+    console.error('/api/odds/history error:', e);
     res.status(500).json({ error: e.message });
   }
 });
-
 
 
 // 取得某一場所有馬（racecard_entries）— 帶出完整欄位
