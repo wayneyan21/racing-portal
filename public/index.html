@@ -111,6 +111,8 @@
     .grid-meeting{grid-template-columns:1fr}
     .race-list{max-height:unset}
   }
+  .is-hidden { display: none !important; }
+
 </style>
 </head>
 <body>
@@ -134,7 +136,7 @@
 </div>
 
 <!-- ===== Context controls ===== -->
-<header class="controls" id="controls">
+<header class="controls is-hidden" id="controls">
   <div class="left" id="controls-left"></div>
   <div class="right" id="controls-right"></div>
 </header>
@@ -396,21 +398,8 @@ function renderControls(){
   left.innerHTML = ''; right.innerHTML = '';
 
   if (state.view === 'meeting') {
-    left.innerHTML = `
-      <div class="field"><label class="muted">賽日</label>
-        <input id="raceDate" type="date" value="${state.raceDate || ''}">
-      </div>
-      <div class="field"><label class="muted">場地</label>
-        <select id="venue">
-          <option value="ST" ${state.venue==='ST'?'selected':''}>沙田 ST</option>
-          <option value="HV" ${state.venue==='HV'?'selected':''}>跑馬地 HV</option>
-        </select>
-      </div>
-      <button class="btn primary" id="btnLoad">載入最新賽日</button>
-    `;
-    right.innerHTML = `
-      <button class="btn accent" id="btnArchive">封存當日</button>
-    `;
+    // 不再顯示日期/場地/封存
+    // left.innerHTML = `<strong>賽日</strong>`; // 想顯示字可留這行
   } else if (state.view === 'horses') {
     left.innerHTML = `<strong>馬匹清單</strong>`;
   } else if (state.view === 'jockeys') {
@@ -423,29 +412,7 @@ function renderControls(){
     left.innerHTML = `<strong>系統設定</strong>`;
   }
 
-  // meeting 控件事件
-  if (state.view === 'meeting') {
-    const btnLoad  = document.getElementById('btnLoad');
-    const btnArch  = document.getElementById('btnArchive');
-    const inputD   = document.getElementById('raceDate');
-    const selectV  = document.getElementById('venue');
-
-    if (btnLoad) btnLoad.onclick = async ()=>{
-      await fetchLatestRaceDate();
-      if (inputD) inputD.value = state.raceDate;
-      await loadRacesFromServer();
-    };
-    if (btnArch) btnArch.onclick = archiveToday;
-
-    if (inputD) inputD.onchange = async (e)=>{
-      state.raceDate = e.target.value;
-      await loadRacesFromServer();
-    };
-    if (selectV) selectV.onchange = async (e)=>{
-      state.venue = e.target.value;
-      await loadRacesFromServer();
-    };
-  }
+  // ✅ meeting 不再掛任何控件事件
 }
 
 /****************************
