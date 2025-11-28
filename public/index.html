@@ -289,6 +289,25 @@ function demoRace(no){
   return { no, time:'--:--', course:'', distance:0, going:'', status:'預定' };
 }
 
+// 傳入 YYYY-MM-DD，嘗試自動判斷該日係 ST 或 HV（有需要可擴充）
+async function detectVenueForDate(d) {
+  const tryVenues = ['ST', 'HV'];       // 有其他場地可以加落去
+  for (const v of tryVenues) {
+    const url = `/api/racecard/races?date=${encodeURIComponent(d)}&venue=${encodeURIComponent(v)}`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        return v; // 呢個場地有賽事，就用佢
+      }
+    } catch (_) {}
+  }
+  return 'ST'; // 後備：都搵唔到就回落 ST
+}
+
+
+
 /****************************
  * 全局狀態
  ****************************/
@@ -619,6 +638,8 @@ async function populateHistoryDates(){
 async function init(){
   try {
     await fetchLatestRaceDate();
+    // 🔸 新增：根據 raceDate 自動偵測場地
+    state.venue = await detectVenueForDate(state.raceDate);
     await loadRacesFromServer();
   } catch(e){
     console.error('init error', e);
@@ -640,8 +661,7 @@ async function init(){
       const d = historySelect.value;
       if (!d) return;
       state.raceDate = d;
-      const inputD = document.getElementById('raceDate');
-      if (inputD) inputD.value = d;
+      state.venue = await detectVenueForDate(d);
       closeHistoryModal();
       await loadRacesFromServer();
     });
