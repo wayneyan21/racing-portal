@@ -968,7 +968,6 @@ def save_to_mysql(meeting: dict, mysql_cfg: dict):
 
     if not race_rows and not entry_rows:
         return 0, 0
-
     with _mysql_conn(mysql_cfg) as conn:
         with conn.cursor() as cur:
             if race_rows:
@@ -976,8 +975,21 @@ def save_to_mysql(meeting: dict, mysql_cfg: dict):
             if entry_rows:
                 cur.executemany(entry_sql, entry_rows)
 
-    return len(race_rows), len(entry_rows)
+            # ⭐⭐ 新增：用馬名由 horse_profiles 對番 horse_id ⭐⭐
+            # 只更新今次呢個 race_date 嘅排位表，避免影響其他日子
+            cur.execute(
+                """
+                UPDATE racecard_entries e
+                JOIN   horse_profiles p
+                  ON   e.horse_name_zh COLLATE utf8mb4_unicode_ci = p.name
+                SET    e.horse_id = p.horse_id
+                WHERE  e.horse_id IS NULL
+                  AND  e.race_date = %s
+                """,
+                (race_date,),
+            )
 
+    return len(race_rows), len(entry_rows)
 
 # ---------- 給 scheduler 用的封裝函式 ----------
 def fetch_and_store_racecard(
