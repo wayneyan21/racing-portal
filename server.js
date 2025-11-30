@@ -418,6 +418,48 @@ app.get('/api/odds', requireAuth, async (req, res) => {
   }
 });
 
+// 🆕 賽事分析：馬匹統計（來自 race_analysis_scores + racecard_entries）
+app.get('/api/race/horse_stats', async (req, res) => {
+  try {
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
+
+    const sql = `
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        ra.horse_runs                                AS starts,
+        -- 呢四個 rate 係 0–1，轉做百分比
+        ROUND(ra.horse_win_rate    * 100, 1)        AS win_pct,
+        ROUND(ra.horse_q_rate      * 100, 1)        AS q_pct,
+        ROUND(ra.horse_place_rate  * 100, 1)        AS place_pct,
+        ROUND(ra.horse_top4_rate   * 100, 1)        AS top4_pct,
+        -- 原始分、norm 分、最後分
+        ROUND(ra.horse_score_raw,   1)              AS score,
+        ROUND(ra.horse_score_norm,  1)              AS total_pct,
+        ROUND(ra.horse_score_final, 1)              AS green10
+      FROM race_analysis_scores ra
+      JOIN racecard_entries e
+        ON ra.race_date = e.race_date
+       AND ra.race_no   = e.race_no
+       AND ra.horse_id  = e.horse_id
+      WHERE ra.race_date   = ?
+        AND ra.venue_code  = ?
+        AND ra.race_no     = ?
+      ORDER BY ra.total_score DESC, e.horse_no ASC
+    `;
+
+    const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
+    res.json(rows);
+  } catch (err) {
+    console.error('[GET /api/race/horse_stats] error', err);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
+
 
 // 取得馬匹資料（最簡版）
 app.get('/api/horses', requireAuth, async (_req, res) => {
