@@ -202,23 +202,27 @@
     <h3 class="section-title">賽事分析 <span class="pill">馬匹統計</span></h3>
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table" id="analysisTable">
-        <thead>
-          <tr>
-            <th>馬號</th>
-            <th>馬名</th>
-            <th>出賽</th>
-            <th>勝出率</th>
-            <th>入Q率</th>
-            <th>入位率</th>
-            <th>入四率</th>
-            <th>得分</th>
-            <th>全部計</th>
-            <th>10記綠＝50分</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="10" class="muted">載入中…</td></tr>
-        </tbody>
+         <thead>
+            <tr>
+               <th>馬號</th>
+               <th>馬名</th>
+               <th>出賽</th>
+               <th>冠</th>
+               <th>亞</th>
+               <th>季</th>
+               <th>第4</th>
+               <th>勝出率</th>
+               <th>入Q率</th>
+               <th>入位率</th>
+               <th>入四率</th>
+               <th>得分</th>
+               <th>全部計</th>
+               <th>10記綠＝50分</th>
+            </tr>
+         </thead>
+         <tbody>
+            <tr><td colspan="14" class="muted">載入中…</td></tr>
+         </tbody>
       </table>
     </div>
     <p class="muted" style="margin-top:.4rem;font-size:12px;">
@@ -618,7 +622,7 @@ async function renderAnalysis(){
   const tbody = document.querySelector('#analysisTable tbody');
 
   if (!state.horseStats || !state.horseStats.length){
-    tbody.innerHTML = `<tr><td colspan="10" class="muted">載入中…</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
       console.log('[race] fetch horse_stats:', url);
@@ -627,14 +631,14 @@ async function renderAnalysis(){
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
-      tbody.innerHTML = `<tr><td colspan="10" class="muted">暫時未能載入馬匹統計。</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
       return;
     }
   }
 
   const list = state.horseStats;
   if (!list.length){
-    tbody.innerHTML = `<tr><td colspan="10" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
@@ -643,16 +647,21 @@ async function renderAnalysis(){
       <td>${r.horse_no ?? ''}</td>
       <td>${r.horse_name_zh || ''}</td>
       <td>${r.starts ?? ''}</td>
-      <td>${r.win_pct ?? ''}</td>
-      <td>${r.q_pct ?? ''}</td>
-      <td>${r.place_pct ?? ''}</td>
-      <td>${r.top4_pct ?? ''}</td>
-      <td>${r.score ?? ''}</td>
-      <td>${r.total_pct ?? ''}</td>
-      <td>${r.green10 ?? ''}</td>
+      <td>${r.win ?? ''}</td>
+      <td>${r.second ?? ''}</td>
+      <td>${r.third ?? ''}</td>
+      <td>${r.fourth ?? ''}</td>
+      <td>${r.win_pct   != null ? r.win_pct   : ''}</td>
+      <td>${r.q_pct     != null ? r.q_pct     : ''}</td>
+      <td>${r.place_pct != null ? r.place_pct : ''}</td>
+      <td>${r.top4_pct  != null ? r.top4_pct  : ''}</td>
+      <td>${r.score     != null ? r.score     : ''}</td>
+      <td>${r.total_pct != null ? r.total_pct : ''}</td>
+      <td>${r.green10   != null ? r.green10   : ''}</td>
     </tr>
   `).join('');
 }
+
 
 // =========================
 // 9. 賽果

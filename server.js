@@ -431,19 +431,23 @@ app.get('/api/race/horse_stats', async (req, res) => {
         e.horse_no,
         e.horse_name_zh,
         ra.horse_runs                              AS starts,
-        ROUND(ra.horse_win_rate   * 100, 1)       AS win_pct,
-        ROUND(ra.horse_q_rate     * 100, 1)       AS q_pct,
-        ROUND(ra.horse_place_rate * 100, 1)       AS place_pct,
-        ROUND(ra.horse_top4_rate  * 100, 1)       AS top4_pct,
-        ROUND(ra.horse_score_raw,   1)            AS score,
-        ROUND(ra.horse_score_norm,  1)            AS total_pct,
-        ROUND(ra.horse_score_final, 1)            AS green10
+        ra.win                                     AS win,
+        ra.second_place                            AS second,
+        ra.third_place                             AS third,
+        ra.forth_place                             AS fourth,
+        ROUND(ra.horse_win_rate   * 100, 1)        AS win_pct,
+        ROUND(ra.horse_q_rate     * 100, 1)        AS q_pct,
+        ROUND(ra.horse_place_rate * 100, 1)        AS place_pct,
+        ROUND(ra.horse_top4_rate  * 100, 1)        AS top4_pct,
+        ROUND(ra.horse_score_raw,   1)             AS score,
+        ROUND(ra.horse_score_norm,  1)             AS total_pct,
+        ROUND(ra.horse_score_final, 1)             AS green10
       FROM race_analysis_scores ra
       JOIN racecard_entries e
         ON ra.race_date = e.race_date
        AND ra.race_no   = e.race_no
-       AND ra.horse_id  COLLATE utf8mb4_unicode_ci   -- ✅ 加上 COLLATE
-           = e.horse_id COLLATE utf8mb4_unicode_ci   -- ✅ 同一個 collation
+       AND ra.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
       WHERE ra.race_date   = ?
         AND ra.venue_code  = ?
         AND ra.race_no     = ?
@@ -457,8 +461,6 @@ app.get('/api/race/horse_stats', async (req, res) => {
     res.status(500).json({ error: 'internal error' });
   }
 });
-
-
 
 
 // 取得馬匹資料（最簡版）
