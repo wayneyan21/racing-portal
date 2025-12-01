@@ -451,7 +451,7 @@ app.get('/api/race/horse_stats', async (req, res) => {
       WHERE ra.race_date   = ?
         AND ra.venue_code  = ?
         AND ra.race_no     = ?
-      ORDER BY ra.total_score DESC, e.horse_no ASC
+      ORDER BY e.horse_no ASC
     `;
 
     const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
