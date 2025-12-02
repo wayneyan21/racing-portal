@@ -418,46 +418,64 @@ app.get('/api/odds', requireAuth, async (req, res) => {
   }
 });
 
-// 🆕 賽事分析：馬匹統計（來自 race_analysis_scores + racecard_entries）
+// 🆕 馬匹＋檔位統計
 app.get('/api/race/horse_stats', async (req, res) => {
-  try {
-    const { date, venue, race_no } = req.query;
-    if (!date || !venue || !race_no) {
-      return res.status(400).json({ error: 'missing date / venue / race_no' });
-    }
+  const { date, venue, race_no } = req.query;
+  if (!date || !venue || !race_no) {
+    return res.status(400).json({ error: 'missing date / venue / race_no' });
+  }
 
-    const sql = `
+  try {
+    const [rows] = await pool.query(
+      `
       SELECT
         e.horse_no,
         e.horse_name_zh,
-        ra.horse_runs                              AS starts,
-        ra.win                                     AS win,
-        ra.second_place                            AS second,
-        ra.third_place                             AS third,
-        ra.forth_place                             AS fourth,
-        ROUND(ra.horse_win_rate   * 100, 1)        AS win_pct,
-        ROUND(ra.horse_q_rate     * 100, 1)        AS q_pct,
-        ROUND(ra.horse_place_rate * 100, 1)        AS place_pct,
-        ROUND(ra.horse_top4_rate  * 100, 1)        AS top4_pct,
-        ROUND(ra.horse_score_raw,   1)             AS score,
-        ROUND(ra.horse_score_norm,  1)             AS total_pct,
-        ROUND(ra.horse_score_final, 1)             AS green10
-      FROM race_analysis_scores ra
-      JOIN racecard_entries e
-        ON ra.race_date = e.race_date
-       AND ra.race_no   = e.race_no
-       AND ra.horse_id  COLLATE utf8mb4_unicode_ci
-           = e.horse_id COLLATE utf8mb4_unicode_ci
-      WHERE ra.race_date   = ?
-        AND ra.venue_code  = ?
-        AND ra.race_no     = ?
-      ORDER BY e.horse_no ASC
-    `;
+        e.draw AS gate_no,
 
-    const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
+        -- 馬匹統計（來自 race_analysis_scores.horse_*）
+        ras.horse_runs,
+        ras.win,
+        ras.second_place,
+        ras.third_place,
+        ras.forth_place,
+        ras.horse_win_rate,
+        ras.horse_q_rate,
+        ras.horse_place_rate,
+        ras.horse_top4_rate,
+        ras.horse_score_raw,
+        ras.horse_score_norm,
+        ras.horse_score_final,
+
+        -- 檔位統計（draw_*）
+        ras.draw_runs,
+        ras.draw_win,
+        ras.draw_second_place,
+        ras.draw_third_place,
+        ras.draw_forth_place,
+        ras.draw_win_rate,
+        ras.draw_q_rate,
+        ras.draw_place_rate,
+        ras.draw_top4_rate,
+        ras.draw_score_raw,
+        ras.draw_score_norm,
+        ras.draw_score_final
+      FROM race_analysis_scores ras
+      JOIN racecard_entries e
+        ON ras.race_date = e.race_date
+       AND ras.race_no   = e.race_no
+       AND ras.horse_id  = e.horse_id
+      WHERE ras.race_date   = ?
+        AND ras.venue_code  = ?
+        AND ras.race_no     = ?
+      ORDER BY e.horse_no
+      `,
+      [date, venue, Number(race_no)]
+    );
+
     res.json(rows);
   } catch (err) {
-    console.error('[GET /api/race/horse_stats] error', err);
+    console.error('[api/race/horse_stats] error', err);
     res.status(500).json({ error: 'internal error' });
   }
 });

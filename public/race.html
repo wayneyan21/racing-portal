@@ -197,7 +197,7 @@
     </div>
   </section>
 
-  <!-- 🆕 賽事分析（馬匹統計） -->
+  <!-- 🆕 賽事分析（馬匹統計 + 檔位統計） -->
   <section class="panel" id="panel-analysis">
     <h3 class="section-title">賽事分析 <span class="pill">馬匹統計</span></h3>
     <div class="table-wrap" style="overflow-x:auto;">
@@ -206,17 +206,17 @@
             <tr>
                <th>馬號</th>
                <th>馬名</th>
-               <th>出賽</th>
+               <th>次數</th> <!-- ＝出賽 -->
                <th>冠</th>
                <th>亞</th>
                <th>季</th>
                <th>第4</th>
-               <th>勝出率</th>
-               <th>入Q率</th>
-               <th>入位率</th>
-               <th>入四率</th>
+               <th>勝出率%</th>
+               <th>入Q率%</th>
+               <th>入位率%</th>
+               <th>入四率%</th>
                <th>得分</th>
-               <th>全部計</th>
+               <th>全部計%</th>
                <th>10記綠＝50分</th>
             </tr>
          </thead>
@@ -225,8 +225,38 @@
          </tbody>
       </table>
     </div>
+
+    <!-- 🆕 檔位統計 table -->
+    <h3 class="section-title" style="margin-top:.9rem;">檔位統計 <span class="pill">同場地 / 路程歷史</span></h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="drawTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>檔位</th>
+            <th>次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="muted">載入中…</td></tr>
+        </tbody>
+      </table>
+    </div>
+
     <p class="muted" style="margin-top:.4rem;font-size:12px;">
-      以上數值會由後端根據 <code>horse_histories</code> 計算（只計比賽日前紀錄），之後你可以再加 Machine Learning 統計。
+      馬匹統計由 <code>horse_histories</code> 計算（只計比賽日前紀錄）；檔位統計由 <code>race_analysis_scores.draw_*</code> 提供，代表同場地 / 同途程 / 同檔位歷史表現。
     </p>
   </section>
 
@@ -288,7 +318,7 @@ const state = {
     WIN: {},
     PLA: {}
   },
-  horseStats: [],  // 🆕 賽事分析用
+  horseStats: [],  // 🆕 賽事分析用（包含馬匹 + 檔位欄位）
   results: []      // 🆕 賽果用
 };
 
@@ -616,13 +646,24 @@ function renderRunners() {
 }
 
 // =========================
-// 8. 賽事分析（馬匹統計）
+// 8. 賽事分析（馬匹統計 + 檔位統計）
 // =========================
+function pct(val){
+  if (val === null || val === undefined) return '';
+  let num = Number(val);
+  if (!Number.isFinite(num)) return '';
+  // 如果係 0–1，當係小數率，乘 100
+  if (num >= 0 && num <= 1) num = num * 100;
+  return num.toFixed(1);
+}
+
 async function renderAnalysis(){
-  const tbody = document.querySelector('#analysisTable tbody');
+  const tbodyHorse = document.querySelector('#analysisTable tbody');
+  const tbodyDraw  = document.querySelector('#drawTable tbody');
 
   if (!state.horseStats || !state.horseStats.length){
-    tbody.innerHTML = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
+    tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
+    tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
       console.log('[race] fetch horse_stats:', url);
@@ -631,35 +672,97 @@ async function renderAnalysis(){
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
-      tbody.innerHTML = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
+      tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
+      tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時未能載入檔位統計。</td></tr>`;
       return;
     }
   }
 
   const list = state.horseStats;
   if (!list.length){
-    tbody.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = list.map(r => `
-    <tr>
-      <td>${r.horse_no ?? ''}</td>
-      <td>${r.horse_name_zh || ''}</td>
-      <td>${r.starts ?? ''}</td>
-      <td>${r.win ?? ''}</td>
-      <td>${r.second ?? ''}</td>
-      <td>${r.third ?? ''}</td>
-      <td>${r.fourth ?? ''}</td>
-      <td>${r.win_pct   != null ? r.win_pct   : ''}</td>
-      <td>${r.q_pct     != null ? r.q_pct     : ''}</td>
-      <td>${r.place_pct != null ? r.place_pct : ''}</td>
-      <td>${r.top4_pct  != null ? r.top4_pct  : ''}</td>
-      <td>${r.score     != null ? r.score     : ''}</td>
-      <td>${r.total_pct != null ? r.total_pct : ''}</td>
-      <td>${r.green10   != null ? r.green10   : ''}</td>
-    </tr>
-  `).join('');
+  // 按馬號排序
+  list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
+
+  // 馬匹統計 table
+  tbodyHorse.innerHTML = list.map(r => {
+    const starts = r.starts ?? r.horse_runs ?? r.total_runs ?? '';
+    const win    = r.win ?? r.win_cnt ?? 0;
+    const second = r.second ?? r.second_place ?? r.place2_cnt ?? 0;
+    const third  = r.third ?? r.place3_cnt ?? 0;
+    const fourth = r.fourth ?? r.place4_cnt ?? 0;
+
+    const winPct   = r.win_pct   ?? r.horse_win_rate ?? r.win_rate;
+    const qPct     = r.q_pct     ?? r.horse_q_rate   ?? r.q_rate;
+    const placePct = r.place_pct ?? r.horse_place_rate ?? r.plc_rate;
+    const top4Pct  = r.top4_pct  ?? r.horse_top4_rate  ?? r.top4_rate;
+
+    const score    = r.score     ?? r.horse_score_raw;
+    const totalPct = r.total_pct ?? r.horse_score_norm;
+    const green10  = r.green10   ?? r.horse_score_final;
+
+    return `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${starts}</td>
+        <td>${win}</td>
+        <td>${second}</td>
+        <td>${third}</td>
+        <td>${fourth}</td>
+        <td>${winPct   != null ? pct(winPct)   : ''}</td>
+        <td>${qPct     != null ? pct(qPct)     : ''}</td>
+        <td>${placePct != null ? pct(placePct) : ''}</td>
+        <td>${top4Pct  != null ? pct(top4Pct)  : ''}</td>
+        <td>${score    != null ? Number(score).toFixed(1)    : ''}</td>
+        <td>${totalPct != null ? Number(totalPct).toFixed(1) : ''}</td>
+        <td>${green10  != null ? Number(green10).toFixed(1)  : ''}</td>
+      </tr>
+    `;
+  }).join('');
+
+  // 檔位統計 table（用 draw_*）
+  tbodyDraw.innerHTML = list.map(r => {
+    const gate = r.gate_no ?? r.draw ?? r.draw_no ?? '';
+    const runs = r.draw_runs ?? 0;
+    const win  = r.draw_win ?? 0;
+    const p2   = r.draw_second_place ?? 0;
+    const p3   = r.draw_third_place ?? 0;
+    const p4   = r.draw_forth_place ?? 0;
+
+    const winPct   = r.draw_win_rate   ?? r.draw_win_pct;
+    const qPct     = r.draw_q_rate     ?? r.draw_qin_pct;
+    const placePct = r.draw_place_rate ?? r.draw_place_pct;
+    const top4Pct  = r.draw_top4_rate  ?? r.draw_top4_pct;
+
+    const score    = r.draw_score_raw;
+    const totalPct = r.draw_score_norm;
+    const green10  = r.draw_score_final;
+
+    return `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${gate}</td>
+        <td>${runs}</td>
+        <td>${win}</td>
+        <td>${p2}</td>
+        <td>${p3}</td>
+        <td>${p4}</td>
+        <td>${winPct   != null ? pct(winPct)   : ''}</td>
+        <td>${qPct     != null ? pct(qPct)     : ''}</td>
+        <td>${placePct != null ? pct(placePct) : ''}</td>
+        <td>${top4Pct  != null ? pct(top4Pct)  : ''}</td>
+        <td>${score    != null ? Number(score).toFixed(1)    : ''}</td>
+        <td>${totalPct != null ? Number(totalPct).toFixed(1) : ''}</td>
+        <td>${green10  != null ? Number(green10).toFixed(1)  : ''}</td>
+      </tr>
+    `;
+  }).join('');
 }
 
 
