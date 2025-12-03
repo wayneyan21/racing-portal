@@ -770,47 +770,6 @@ async function renderAnalysis(){
 }
 
 
-  // 檔位統計 table（用 draw_*）
-  tbodyDraw.innerHTML = list.map(r => {
-    const gate = r.gate_no ?? r.draw ?? r.draw_no ?? '';
-    const runs = r.draw_runs ?? 0;
-    const win  = r.draw_win ?? 0;
-    const p2   = r.draw_second_place ?? 0;
-    const p3   = r.draw_third_place ?? 0;
-    const p4   = r.draw_forth_place ?? 0;
-
-    const winPct   = r.draw_win_rate   ?? r.draw_win_pct;
-    const qPct     = r.draw_q_rate     ?? r.draw_qin_pct;
-    const placePct = r.draw_place_rate ?? r.draw_place_pct;
-    const top4Pct  = r.draw_top4_rate  ?? r.draw_top4_pct;
-
-    const score    = r.draw_score_raw;
-    const totalPct = r.draw_score_norm;
-    const green10  = r.draw_score_final;
-
-    return `
-      <tr>
-        <td>${r.horse_no ?? ''}</td>
-        <td>${r.horse_name_zh || ''}</td>
-        <td>${gate}</td>
-        <td>${runs}</td>
-        <td>${win}</td>
-        <td>${p2}</td>
-        <td>${p3}</td>
-        <td>${p4}</td>
-        <td>${winPct   != null ? pct(winPct)   : ''}</td>
-        <td>${qPct     != null ? pct(qPct)     : ''}</td>
-        <td>${placePct != null ? pct(placePct) : ''}</td>
-        <td>${top4Pct  != null ? pct(top4Pct)  : ''}</td>
-        <td>${score    != null ? Number(score).toFixed(1)    : ''}</td>
-        <td>${totalPct != null ? Number(totalPct).toFixed(1) : ''}</td>
-        <td>${green10  != null ? Number(green10).toFixed(1)  : ''}</td>
-      </tr>
-    `;
-  }).join('');
-}
-
-
 // =========================
 // 9. 賽果
 // =========================
