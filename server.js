@@ -434,32 +434,49 @@ app.get('/api/race/horse_stats', async (req, res) => {
     }
 
     const sql = `
-      SELECT
-        e.horse_no,
-        e.horse_name_zh,
-        ra.horse_runs                              AS starts,
-        ra.win                                     AS win,
-        ra.second_place                            AS second,
-        ra.third_place                             AS third,
-        ra.forth_place                             AS fourth,
-        ROUND(ra.horse_win_rate   * 100, 1)        AS win_pct,
-        ROUND(ra.horse_q_rate     * 100, 1)        AS q_pct,
-        ROUND(ra.horse_place_rate * 100, 1)        AS place_pct,
-        ROUND(ra.horse_top4_rate  * 100, 1)        AS top4_pct,
-        ROUND(ra.horse_score_raw,   1)             AS score,
-        ROUND(ra.horse_score_norm,  1)             AS total_pct,
-        ROUND(ra.horse_score_final, 1)             AS green10
-      FROM race_analysis_scores ra
-      JOIN racecard_entries e
-        ON ra.race_date = e.race_date
-       AND ra.race_no   = e.race_no
-       AND ra.horse_id  COLLATE utf8mb4_unicode_ci
-           = e.horse_id COLLATE utf8mb4_unicode_ci
-      WHERE ra.race_date   = ?
-        AND ra.venue_code  = ?
-        AND ra.race_no     = ?
-      ORDER BY e.horse_no ASC
-    `;
+  SELECT
+    e.horse_no,
+    e.horse_name_zh,
+
+    -- 馬匹統計
+    ra.horse_runs                              AS starts,
+    ra.win                                     AS win,
+    ra.second_place                            AS second,
+    ra.third_place                             AS third,
+    ra.forth_place                             AS fourth,
+    ROUND(ra.horse_win_rate   * 100, 1)        AS win_pct,
+    ROUND(ra.horse_q_rate     * 100, 1)        AS q_pct,
+    ROUND(ra.horse_place_rate * 100, 1)        AS place_pct,
+    ROUND(ra.horse_top4_rate  * 100, 1)        AS top4_pct,
+    ROUND(ra.horse_score_raw,   1)             AS score,
+    ROUND(ra.horse_score_norm,  1)             AS total_pct,
+    ROUND(ra.horse_score_final, 1)             AS green10,
+
+    -- 🆕 檔位統計
+    ra.draw_runs,
+    ra.draw_win,
+    ra.draw_second_place,
+    ra.draw_third_place,
+    ra.draw_forth_place,
+    ROUND(ra.draw_win_rate    * 100, 1)        AS draw_win_pct,
+    ROUND(ra.draw_q_rate      * 100, 1)        AS draw_q_pct,
+    ROUND(ra.draw_place_rate  * 100, 1)        AS draw_place_pct,
+    ROUND(ra.draw_top4_rate   * 100, 1)        AS draw_top4_pct,
+    ROUND(ra.draw_score_raw,   1)              AS draw_score,
+    ROUND(ra.draw_score_norm,  1)              AS draw_total_pct,
+    ROUND(ra.draw_score_final, 1)              AS draw_green10
+
+  FROM race_analysis_scores ra
+  JOIN racecard_entries e
+    ON ra.race_date = e.race_date
+   AND ra.race_no   = e.race_no
+   AND ra.horse_id  COLLATE utf8mb4_unicode_ci
+       = e.horse_id COLLATE utf8mb4_unicode_ci
+  WHERE ra.race_date   = ?
+    AND ra.venue_code  = ?
+    AND ra.race_no     = ?
+  ORDER BY e.horse_no ASC
+`;
 
     const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
     return res.json(rows);
