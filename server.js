@@ -437,7 +437,7 @@ app.get('/api/race/horse_stats', async (req, res) => {
   SELECT
     e.horse_no,
     e.horse_name_zh,
-
+    e.draw                                   AS gate_no,   -- 👈 新增呢行
     -- 馬匹統計
     ra.horse_runs                              AS starts,
     ra.win                                     AS win,

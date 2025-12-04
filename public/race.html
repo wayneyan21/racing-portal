@@ -678,15 +678,23 @@ async function renderAnalysis(){
     }
   }
 
-  const list = state.horseStats;
+   const list = state.horseStats;
   if (!list.length){
     tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
+  // ✅ 新增：用出馬名單 build 一個「馬號 → entry」對照表
+  const entryByHorseNo = {};
+  (state.entries || []).forEach(e => {
+    const key = String(e.horse_no);
+    entryByHorseNo[key] = e;
+  });
+
   // 按馬號排序
   list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
+
 
   // 🐎 上面：馬匹統計
   tbodyHorse.innerHTML = list.map(r => {
@@ -727,8 +735,11 @@ async function renderAnalysis(){
 
   // 🧱 下面：檔位統計
   tbodyDraw.innerHTML = list.map(r => {
-    // 檔位：後端可以叫 gate_no / draw / draw_no
-    const gate = r.gate_no ?? r.draw ?? r.draw_no ?? '';
+    const horseNoKey = String(r.horse_no ?? '');
+    const entry      = entryByHorseNo[horseNoKey] || {};
+
+    // ✅ 先用出馬表的 draw，冇先再退而求其次用 API 回傳欄位
+    const gate = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
 
     const runs = r.draw_runs ?? 0;
     const win  = r.draw_win ?? 0;
