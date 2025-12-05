@@ -644,7 +644,6 @@ function renderRunners() {
       </tr>`;
   }).join('');
 }
-
 // =========================
 // 8. 賽事分析（馬匹統計 + 檔位統計）
 // =========================
@@ -661,6 +660,7 @@ async function renderAnalysis(){
   const tbodyHorse = document.querySelector('#analysisTable tbody');
   const tbodyDraw  = document.querySelector('#drawTable tbody');
 
+  // 第一次入 tab：向後端拎 /api/race/horse_stats
   if (!state.horseStats || !state.horseStats.length){
     tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
     tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
@@ -669,6 +669,7 @@ async function renderAnalysis(){
       console.log('[race] fetch horse_stats:', url);
       const res  = await fetch(url);
       const rows = await res.json();
+      console.log('[race] horse_stats sample:', rows[0]);   // 🔍 debug：睇下有冇 gate_no
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
@@ -678,23 +679,21 @@ async function renderAnalysis(){
     }
   }
 
-   const list = state.horseStats;
+  const list = state.horseStats;
   if (!list.length){
     tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
-  // ✅ 新增：用出馬名單 build 一個「馬號 → entry」對照表
+  // ✅ 用出馬名單 build「馬號 → entry」map，咁就一定有檔位
   const entryByHorseNo = {};
   (state.entries || []).forEach(e => {
-    const key = String(e.horse_no);
-    entryByHorseNo[key] = e;
+    entryByHorseNo[String(e.horse_no)] = e;
   });
 
   // 按馬號排序
   list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
-
 
   // 🐎 上面：馬匹統計
   tbodyHorse.innerHTML = list.map(r => {
@@ -704,8 +703,8 @@ async function renderAnalysis(){
     const third  = r.third ?? r.place3_cnt ?? 0;
     const fourth = r.fourth ?? r.place4_cnt ?? 0;
 
-    const winPct   = r.win_pct   ?? r.horse_win_rate ?? r.win_rate;
-    const qPct     = r.q_pct     ?? r.horse_q_rate   ?? r.q_rate;
+    const winPct   = r.win_pct   ?? r.horse_win_rate   ?? r.win_rate;
+    const qPct     = r.q_pct     ?? r.horse_q_rate     ?? r.q_rate;
     const placePct = r.place_pct ?? r.horse_place_rate ?? r.plc_rate;
     const top4Pct  = r.top4_pct  ?? r.horse_top4_rate  ?? r.top4_rate;
 
@@ -738,7 +737,7 @@ async function renderAnalysis(){
     const horseNoKey = String(r.horse_no ?? '');
     const entry      = entryByHorseNo[horseNoKey] || {};
 
-    // ✅ 先用出馬表的 draw，冇先再退而求其次用 API 回傳欄位
+    // 🔑 檔位優先順序：出馬表 draw → API 回傳 gate_no → 其他備用欄位
     const gate = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
 
     const runs = r.draw_runs ?? 0;
@@ -747,16 +746,14 @@ async function renderAnalysis(){
     const p3   = r.draw_third_place ?? 0;
     const p4   = r.draw_forth_place ?? 0;
 
-    // 百分比：支援 *_rate（0–1）同 *_pct（已乘 100）
     const winPct   = r.draw_win_pct   ?? r.draw_win_rate;
-    const qPct     = r.draw_q_pct     ?? r.draw_q_rate;          // 🔧 改咗呢行
+    const qPct     = r.draw_q_pct     ?? r.draw_q_rate;
     const placePct = r.draw_place_pct ?? r.draw_place_rate;
     const top4Pct  = r.draw_top4_pct  ?? r.draw_top4_rate;
 
-    // 得分 / 全部計 / 10記錄：支援 alias 同原名
-    const score    = r.draw_score     ?? r.draw_score_raw;       // 🔧 新增 alias
-    const totalPct = r.draw_total_pct ?? r.draw_score_norm;      // 🔧 新增 alias
-    const green10  = r.draw_green10   ?? r.draw_score_final;     // 🔧 新增 alias
+    const score    = r.draw_score     ?? r.draw_score_raw;
+    const totalPct = r.draw_total_pct ?? r.draw_score_norm;
+    const green10  = r.draw_green10   ?? r.draw_score_final;
 
     return `
       <tr>
@@ -769,12 +766,12 @@ async function renderAnalysis(){
         <td>${p3}</td>
         <td>${p4}</td>
         <td>${winPct   != null ? pct(winPct)   : ''}</td>
-        <td>${qPct     != null ? pct(qPct)     : ''}</td>   <!-- 入Q率% -->
+        <td>${qPct     != null ? pct(qPct)     : ''}</td>
         <td>${placePct != null ? pct(placePct) : ''}</td>
         <td>${top4Pct  != null ? pct(top4Pct)  : ''}</td>
-        <td>${score    != null ? Number(score).toFixed(1)    : ''}</td>  <!-- 得分 -->
-        <td>${totalPct != null ? Number(totalPct).toFixed(1) : ''}</td>  <!-- 全部計% -->
-        <td>${green10  != null ? Number(green10).toFixed(1)  : ''}</td>  <!-- 10記錄=50分 -->
+        <td>${score    != null ? Number(score).toFixed(1)    : ''}</td>
+        <td>${totalPct != null ? Number(totalPct).toFixed(1) : ''}</td>
+        <td>${green10  != null ? Number(green10).toFixed(1)  : ''}</td>
       </tr>
     `;
   }).join('');
