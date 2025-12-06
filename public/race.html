@@ -197,37 +197,73 @@
     </div>
   </section>
 
-  <!-- 🆕 賽事分析（馬匹統計 + 檔位統計） -->
+    <!-- 🆕 賽事分析（全部統計 table 骨架） -->
   <section class="panel" id="panel-analysis">
-    <h3 class="section-title">賽事分析 <span class="pill">馬匹統計</span></h3>
+    <!-- 1) 馬匹整體統計 -->
+    <h3 class="section-title">
+      賽事分析 <span class="pill">馬匹整體統計</span>
+    </h3>
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table" id="analysisTable">
-         <thead>
-            <tr>
-               <th>馬號</th>
-               <th>馬名</th>
-               <th>次數</th> <!-- ＝出賽 -->
-               <th>冠</th>
-               <th>亞</th>
-               <th>季</th>
-               <th>第4</th>
-               <th>勝出率%</th>
-               <th>入Q率%</th>
-               <th>入位率%</th>
-               <th>入四率%</th>
-               <th>得分</th>
-               <th>全部計%</th>
-               <th>10記綠＝50分</th>
-            </tr>
-         </thead>
-         <tbody>
-            <tr><td colspan="14" class="muted">載入中…</td></tr>
-         </tbody>
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>次數</th> <!-- ＝出賽 -->
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="14" class="muted">載入中…</td></tr>
+        </tbody>
       </table>
     </div>
 
-    <!-- 🆕 檔位統計 table -->
-    <h3 class="section-title" style="margin-top:.9rem;">檔位統計 <span class="pill">同場地 / 路程歷史</span></h3>
+    <!-- 2) 負磅統計（按今場負磅 level 歸類） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      負磅統計 <span class="pill">按負磅區間歷史表現</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="weightTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>負磅區間</th> <!-- 例如 &lt;120 / 120–129 / ≥130 -->
+            <th>次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="muted">暫未接駁負磅統計資料。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 3) 檔位統計（整體：同場地 / 路程 / 檔位歷史） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      檔位統計 <span class="pill">同場地 / 路程歷史</span>
+    </h3>
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table" id="drawTable">
         <thead>
@@ -255,10 +291,235 @@
       </table>
     </div>
 
-    <p class="muted" style="margin-top:.4rem;font-size:12px;">
-      馬匹統計由 <code>horse_histories</code> 計算（只計比賽日前紀錄）；檔位統計由 <code>race_analysis_scores.draw_*</code> 提供，代表同場地 / 同途程 / 同檔位歷史表現。
+    <!-- 3.5) 馬匹檔位統計（每匹馬自身在不同檔位的歷史） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      馬匹檔位統計 <span class="pill">按馬匹拆分檔位表現</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="horseDrawTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>檔位</th>
+            <th>次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="muted">暫未接駁馬匹檔位統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 4) 馬匹路程統計 -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      馬匹路程統計 <span class="pill">同場地 / 不同途程</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="horseDistTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>場地</th>
+            <th>路程 (m)</th>
+            <th>次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="16" class="muted">暫未接駁馬匹路程統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 5) 騎師路程統計 -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      騎師路程統計 <span class="pill">騎師同場地 / 路程表現</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="jockeyDistTable">
+        <thead>
+          <tr>
+            <th>騎師</th>
+            <th>場地</th>
+            <th>路程 (m)</th>
+            <th>騎乘次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="muted">暫未接駁騎師路程統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 6) 練馬師路程統計 -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      練馬師路程統計 <span class="pill">練馬師同場地 / 路程表現</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="trainerDistTable">
+        <thead>
+          <tr>
+            <th>練馬師</th>
+            <th>場地</th>
+            <th>路程 (m)</th>
+            <th>出馬次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="15" class="muted">暫未接駁練馬師路程統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 7) 人馬合作統計（騎師 × 馬匹） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      人馬合作統計 <span class="pill">騎師 × 馬匹</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="horseJockeyTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>騎師</th>
+            <th>合作次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="16" class="muted">暫未接駁人馬合作統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 8) 騎練路程統計（騎師 × 練馬師 × 路程） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      騎練路程統計 <span class="pill">騎師 × 練馬師 × 場地 / 路程</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="trainerJockeyDistTable">
+        <thead>
+          <tr>
+            <th>練馬師</th>
+            <th>騎師</th>
+            <th>場地</th>
+            <th>路程 (m)</th>
+            <th>合作次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="16" class="muted">暫未接駁騎練路程統計。</td></tr>
+        </tbody>
+      </table>
+    </div>
+        <!-- 9) 綜合評分總覽（集合以上各項得分） -->
+    <h3 class="section-title" style="margin-top:.9rem;">
+      綜合評分總覽 <span class="pill">所有統計得分 + 總分</span>
+    </h3>
+    <div class="table-wrap" style="overflow-x:auto;">
+      <table class="table" id="summaryTable">
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+
+            <!-- 各個分析模塊的最終分數 -->
+            <th>馬匹整體分</th>      <!-- 來自 analysisTable / race_analysis_scores.horse_score_final -->
+            <th>負磅分</th>          <!-- 來自 weightTable / race_combo_scores (WEIGHT_*) -->
+            <th>檔位整體分</th>      <!-- 來自 drawTable / draw_score_final -->
+            <th>馬匹檔位分</th>      <!-- 來自 horseDrawTable -->
+            <th>馬匹路程分</th>      <!-- 來自 horseDistTable -->
+            <th>騎師路程分</th>      <!-- 來自 jockeyDistTable -->
+            <th>練馬師路程分</th>    <!-- 來自 trainerDistTable -->
+            <th>人馬合作分</th>      <!-- 來自 horseJockeyTable -->
+            <th>騎練路程分</th>      <!-- 來自 trainerJockeyDistTable -->
+
+            <!-- 最後一欄：綜合理論總分 -->
+            <th>總分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td colspan="12" class="muted">
+              暫未接駁綜合評分資料（之後可由各 table 分數加權計算）。
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="muted" style="margin-top:.6rem;font-size:12px;">
+      以上統計暫時只建立版面，之後可逐步由後端（如 <code>race_analysis_scores</code>、
+      <code>race_combo_scores</code>、<code>horse_histories</code> 等）接駁數據。
     </p>
   </section>
+
 
   <!-- 🆕 賽果 -->
   <section class="panel" id="panel-results">
