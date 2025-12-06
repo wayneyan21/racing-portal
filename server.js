@@ -418,10 +418,9 @@ app.get('/api/odds', requireAuth, async (req, res) => {
   }
 });
 
-// 🆕 馬匹＋檔位統計
 // 🆕 賽事分析：馬匹統計（來自 race_analysis_scores + racecard_entries）
+// 🆕 馬匹＋檔位＋負磅統計
 app.get('/api/race/horse_stats', async (req, res) => {
-  // 1️⃣ 先 check pool
   if (!pool) {
     console.error('[GET /api/race/horse_stats] pool not ready');
     return res.status(503).json({ error: 'DB not ready' });
@@ -434,55 +433,79 @@ app.get('/api/race/horse_stats', async (req, res) => {
     }
 
     const sql = `
-  SELECT
-    e.horse_no,
-    e.horse_name_zh,
-    e.draw                                   AS gate_no,   -- 👈 新增呢行
-    -- 馬匹統計
-    ra.horse_runs                              AS starts,
-    ra.win                                     AS win,
-    ra.second_place                            AS second,
-    ra.third_place                             AS third,
-    ra.forth_place                             AS fourth,
-    ROUND(ra.horse_win_rate   * 100, 1)        AS win_pct,
-    ROUND(ra.horse_q_rate     * 100, 1)        AS q_pct,
-    ROUND(ra.horse_place_rate * 100, 1)        AS place_pct,
-    ROUND(ra.horse_top4_rate  * 100, 1)        AS top4_pct,
-    ROUND(ra.horse_score_raw,   1)             AS score,
-    ROUND(ra.horse_score_norm,  1)             AS total_pct,
-    ROUND(ra.horse_score_final, 1)             AS green10,
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        e.draw                                   AS gate_no,
 
-    -- 🆕 檔位統計
-    ra.draw_runs,
-    ra.draw_win,
-    ra.draw_second_place,
-    ra.draw_third_place,
-    ra.draw_forth_place,
-    ROUND(ra.draw_win_rate    * 100, 1)        AS draw_win_pct,
-    ROUND(ra.draw_q_rate      * 100, 1)        AS draw_q_pct,
-    ROUND(ra.draw_place_rate  * 100, 1)        AS draw_place_pct,
-    ROUND(ra.draw_top4_rate   * 100, 1)        AS draw_top4_pct,
-    ROUND(ra.draw_score_raw,   1)              AS draw_score,
-    ROUND(ra.draw_score_norm,  1)              AS draw_total_pct,
-    ROUND(ra.draw_score_final, 1)              AS draw_green10
+        -- 🐎 馬匹統計（race_analysis_scores）
+        ra.horse_runs                              AS starts,
+        ra.win                                     AS win,
+        ra.second_place                            AS second,
+        ra.third_place                             AS third,
+        ra.forth_place                             AS fourth,
+        ra.horse_win_rate                          AS win_pct,      -- 0–1 or 0–100 都得，前端會再處理
+        ra.horse_q_rate                            AS q_pct,
+        ra.horse_place_rate                        AS place_pct,
+        ra.horse_top4_rate                         AS top4_pct,
+        ra.horse_score_raw                         AS score,
+        ra.horse_score_norm                        AS total_pct,
+        ra.horse_score_final                       AS green10,
 
-  FROM race_analysis_scores ra
-  JOIN racecard_entries e
-    ON ra.race_date = e.race_date
-   AND ra.race_no   = e.race_no
-   AND ra.horse_id  COLLATE utf8mb4_unicode_ci
-       = e.horse_id COLLATE utf8mb4_unicode_ci
-  WHERE ra.race_date   = ?
-    AND ra.venue_code  = ?
-    AND ra.race_no     = ?
-  ORDER BY e.horse_no ASC
-`;
+        -- 🧱 檔位統計
+        ra.draw_runs,
+        ra.draw_win,
+        ra.draw_second_place,
+        ra.draw_third_place,
+        ra.draw_forth_place,
+        ra.draw_win_rate                           AS draw_win_pct,
+        ra.draw_q_rate                             AS draw_q_pct,
+        ra.draw_place_rate                         AS draw_place_pct,
+        ra.draw_top4_rate                          AS draw_top4_pct,
+        ra.draw_score_raw                          AS draw_score,
+        ra.draw_score_norm                         AS draw_total_pct,
+        ra.draw_score_final                        AS draw_green10,
+
+        -- ⚖️ 負磅統計（race_combo_scores：metric_code = 'WEIGHT_xxx'）
+        w.metric_code                              AS weight_band,
+        w.runs                                     AS wt_runs,
+        w.win_cnt                                  AS wt_win,
+        w.second_cnt                               AS wt_second,
+        w.third_cnt                                AS wt_third,
+        w.fourth_cnt                               AS wt_fourth,
+        w.win_pct                                  AS wt_win_pct,
+        w.q_pct                                    AS wt_q_pct,
+        w.place_pct                                AS wt_place_pct,
+        w.top4_pct                                 AS wt_top4_pct,
+        w.score_raw                                AS wt_score,
+        w.score_norm                               AS wt_total_pct,
+        w.score_final                              AS wt_green10
+
+      FROM race_analysis_scores ra
+      JOIN racecard_entries e
+        ON ra.race_date = e.race_date
+       AND ra.race_no   = e.race_no
+       AND ra.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
+
+      -- 👇 重要：用 metric_code LIKE 'WEIGHT%' 連接負磅統計
+      LEFT JOIN race_combo_scores w
+        ON w.race_date   = ra.race_date
+       AND w.venue_code  = ra.venue_code
+       AND w.race_no     = ra.race_no
+       AND w.horse_id    = ra.horse_id
+       AND w.metric_code LIKE 'WEIGHT%'
+
+      WHERE ra.race_date   = ?
+        AND ra.venue_code  = ?
+        AND ra.race_no     = ?
+      ORDER BY e.horse_no ASC
+    `;
 
     const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
     return res.json(rows);
   } catch (err) {
     console.error('[GET /api/race/horse_stats] SQL error:', err);
-    // ⚠️ 暫時直接回傳真 error，方便你我睇清楚原因
     return res.status(500).json({ error: String(err.message || err) });
   }
 });
