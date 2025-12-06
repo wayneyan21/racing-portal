@@ -579,10 +579,11 @@ const state = {
     WIN: {},
     PLA: {}
   },
-  horseStats: [],  // 🆕 賽事分析用（包含馬匹 + 檔位欄位）
+  horseStats: [],   // 賽事分析用（馬匹 + 檔位）
+  results: [],      // 賽果
   weightStats: []   // 🆕 負磅統計
-  results: []      // 🆕 賽果用
 };
+
 
 // =========================
 // 3. 返回 / 重新載入
@@ -935,6 +936,7 @@ async function renderAnalysis(){
       console.log('[race] fetch horse_stats:', url);
       const res  = await fetch(url);
       const rows = await res.json();
+      console.log('[race] horse_stats sample:', rows[0]);
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
@@ -962,7 +964,7 @@ async function renderAnalysis(){
   // 按馬號排序
   list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
 
-  // 🐎 上面：馬匹統計
+  // 🐎 1) 上面：馬匹統計
   tbodyHorse.innerHTML = list.map(r => {
     const starts = r.starts ?? r.horse_runs ?? r.total_runs ?? '';
     const win    = r.win ?? r.win_cnt ?? 0;
@@ -999,10 +1001,11 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // 🧱 檔位統計
+  // 🧱 2) 檔位統計
   tbodyDraw.innerHTML = list.map(r => {
     const horseNoKey = String(r.horse_no ?? '');
     const entry      = entryByHorseNo[horseNoKey] || {};
+    // 檔位優先：出馬表 draw → API gate_no → 其他備用欄位
     const gate = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
 
     const runs = r.draw_runs ?? 0;
@@ -1041,7 +1044,7 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // ⚖️ 負磅統計（/api/race/weight_stats）
+  // ⚖️ 3) 負磅統計（/api/race/weight_stats）
   if (!state.weightStats || !state.weightStats.length) {
     try {
       const urlW = `/api/race/weight_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
