@@ -580,6 +580,7 @@ const state = {
     PLA: {}
   },
   horseStats: [],  // 🆕 賽事分析用（包含馬匹 + 檔位欄位）
+  weightStats: []   // 🆕 負磅統計
   results: []      // 🆕 賽果用
 };
 
@@ -905,8 +906,10 @@ function renderRunners() {
       </tr>`;
   }).join('');
 }
+
+
 // =========================
-// 8. 賽事分析（馬匹統計 + 檔位統計）
+// 8. 賽事分析（馬匹統計 + 檔位統計 + 負磅統計）
 // =========================
 function pct(val){
   if (val === null || val === undefined) return '';
@@ -918,36 +921,39 @@ function pct(val){
 }
 
 async function renderAnalysis(){
-  const tbodyHorse = document.querySelector('#analysisTable tbody');
-  const tbodyDraw  = document.querySelector('#drawTable tbody');
+  const tbodyHorse  = document.querySelector('#analysisTable tbody');
+  const tbodyDraw   = document.querySelector('#drawTable tbody');
+  const tbodyWeight = document.querySelector('#weightTable tbody');
 
   // 第一次入 tab：向後端拎 /api/race/horse_stats
   if (!state.horseStats || !state.horseStats.length){
-    tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
-    tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyHorse.innerHTML  = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
+    tbodyDraw.innerHTML   = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
       console.log('[race] fetch horse_stats:', url);
       const res  = await fetch(url);
       const rows = await res.json();
-      console.log('[race] horse_stats sample:', rows[0]);   // 🔍 debug：睇下有冇 gate_no
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
-      tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
-      tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時未能載入檔位統計。</td></tr>`;
+      tbodyHorse.innerHTML  = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
+      tbodyDraw.innerHTML   = `<tr><td colspan="15" class="muted">暫時未能載入檔位統計。</td></tr>`;
+      tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
       return;
     }
   }
 
   const list = state.horseStats;
   if (!list.length){
-    tbodyHorse.innerHTML = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
-    tbodyDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyHorse.innerHTML  = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyDraw.innerHTML   = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
-  // ✅ 用出馬名單 build「馬號 → entry」map，咁就一定有檔位
+  // 用出馬名單 build「馬號 → entry」map（用嚟拎檔位）
   const entryByHorseNo = {};
   (state.entries || []).forEach(e => {
     entryByHorseNo[String(e.horse_no)] = e;
@@ -993,12 +999,10 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // 🧱 下面：檔位統計
+  // 🧱 檔位統計
   tbodyDraw.innerHTML = list.map(r => {
     const horseNoKey = String(r.horse_no ?? '');
     const entry      = entryByHorseNo[horseNoKey] || {};
-
-    // 🔑 檔位優先順序：出馬表 draw → API 回傳 gate_no → 其他備用欄位
     const gate = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
 
     const runs = r.draw_runs ?? 0;
@@ -1036,6 +1040,54 @@ async function renderAnalysis(){
       </tr>
     `;
   }).join('');
+
+  // ⚖️ 負磅統計（/api/race/weight_stats）
+  if (!state.weightStats || !state.weightStats.length) {
+    try {
+      const urlW = `/api/race/weight_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
+      console.log('[race] fetch weight_stats:', urlW);
+      const resW  = await fetch(urlW);
+      const rowsW = await resW.json();
+      state.weightStats = Array.isArray(rowsW) ? rowsW : [];
+    } catch (e) {
+      console.error('[race] weight_stats error', e);
+      tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
+      return;
+    }
+  }
+
+  const wList = state.weightStats;
+  if (!wList.length) {
+    tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有負磅統計資料。</td></tr>`;
+    return;
+  }
+
+  // 按馬號 + 負磅區間排序
+  wList.sort((a,b)=>{
+    const ha = Number(a.horse_no||0) - Number(b.horse_no||0);
+    if (ha !== 0) return ha;
+    return String(a.weight_zone||'').localeCompare(String(b.weight_zone||''));
+  });
+
+  tbodyWeight.innerHTML = wList.map(r => `
+    <tr>
+      <td>${r.horse_no ?? ''}</td>
+      <td>${r.horse_name_zh || ''}</td>
+      <td>${r.weight_zone || ''}</td>
+      <td>${r.runs ?? ''}</td>
+      <td>${r.win_cnt ?? ''}</td>
+      <td>${r.second_cnt ?? ''}</td>
+      <td>${r.third_cnt ?? ''}</td>
+      <td>${r.fourth_cnt ?? ''}</td>
+      <td>${pct(r.win_pct)}</td>
+      <td>${pct(r.q_pct)}</td>
+      <td>${pct(r.place_pct)}</td>
+      <td>${pct(r.top4_pct)}</td>
+      <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+      <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+      <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+    </tr>
+  `).join('');
 }
 
 
