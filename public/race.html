@@ -929,12 +929,13 @@ async function renderAnalysis(){
   const tbodyHorseDraw = document.querySelector('#horseDrawTable tbody'); // 🆕
 
 
-  // 第一次入 tab：向後端拎 /api/race/horse_stats
-    if (!state.horseStats || !state.horseStats.length){
+  // 1) 第一次入 tab：向後端拎 /api/race/horse_stats
+  if (!state.horseStats || !state.horseStats.length){
     tbodyHorse.innerHTML     = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
     tbodyDraw.innerHTML      = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
     tbodyWeight.innerHTML    = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
-    tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`; // 🆕
+    tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
       console.log('[race] fetch horse_stats:', url);
@@ -944,20 +945,20 @@ async function renderAnalysis(){
       state.horseStats = Array.isArray(rows) ? rows : [];
     }catch(e){
       console.error('[race] horse_stats error', e);
-      tbodyHorse.innerHTML  = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
-      tbodyDraw.innerHTML   = `<tr><td colspan="15" class="muted">暫時未能載入檔位統計。</td></tr>`;
-      tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
-      tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入馬匹檔位統計。</td></tr>`; // 🆕
+      tbodyHorse.innerHTML     = `<tr><td colspan="14" class="muted">暫時未能載入馬匹統計。</td></tr>`;
+      tbodyDraw.innerHTML      = `<tr><td colspan="15" class="muted">暫時未能載入檔位統計。</td></tr>`;
+      tbodyWeight.innerHTML    = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
+      tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入馬匹檔位統計。</td></tr>`;
       return;
     }
   }
 
   const list = state.horseStats;
   if (!list.length){
-    tbodyHorse.innerHTML  = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
-    tbodyDraw.innerHTML   = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
-    tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
-    tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`; // 🆕
+    tbodyHorse.innerHTML     = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyDraw.innerHTML      = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyWeight.innerHTML    = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
@@ -970,7 +971,7 @@ async function renderAnalysis(){
   // 按馬號排序
   list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
 
-  // 🐎 1) 上面：馬匹統計
+  // 2) 馬匹整體統計 (analysisTable)
   tbodyHorse.innerHTML = list.map(r => {
     const starts = r.starts ?? r.horse_runs ?? r.total_runs ?? '';
     const win    = r.win ?? r.win_cnt ?? 0;
@@ -1007,12 +1008,11 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // 🧱 2) 檔位統計
+  // 3) 檔位統計 (drawTable)
   tbodyDraw.innerHTML = list.map(r => {
     const horseNoKey = String(r.horse_no ?? '');
     const entry      = entryByHorseNo[horseNoKey] || {};
-    // 檔位優先：出馬表 draw → API gate_no → 其他備用欄位
-    const gate = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
+    const gate       = entry.draw ?? r.gate_no ?? r.draw ?? r.draw_no ?? '';
 
     const runs = r.draw_runs ?? 0;
     const win  = r.draw_win ?? 0;
@@ -1050,7 +1050,7 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // ⚖️ 3) 負磅統計（/api/race/weight_stats）
+  // 4) 負磅統計 (weightTable, /api/race/weight_stats)
   if (!state.weightStats || !state.weightStats.length) {
     try {
       const urlW = `/api/race/weight_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1061,42 +1061,42 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] weight_stats error', e);
       tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
-      return;
+      // 負磅失敗唔阻住檔位 / 馬匹統計
     }
   }
 
-  const wList = state.weightStats;
+  const wList = state.weightStats || [];
   if (!wList.length) {
     tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有負磅統計資料。</td></tr>`;
-    return;
+  } else {
+    wList.sort((a,b)=>{
+      const ha = Number(a.horse_no||0) - Number(b.horse_no||0);
+      if (ha !== 0) return ha;
+      return String(a.weight_zone||'').localeCompare(String(b.weight_zone||''));
+    });
+
+    tbodyWeight.innerHTML = wList.map(r => `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${r.weight_zone || ''}</td>
+        <td>${r.runs ?? ''}</td>
+        <td>${r.win_cnt ?? ''}</td>
+        <td>${r.second_cnt ?? ''}</td>
+        <td>${r.third_cnt ?? ''}</td>
+        <td>${r.fourth_cnt ?? ''}</td>
+        <td>${pct(r.win_pct)}</td>
+        <td>${pct(r.q_pct)}</td>
+        <td>${pct(r.place_pct)}</td>
+        <td>${pct(r.top4_pct)}</td>
+        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+      </tr>
+    `).join('');
   }
 
-  // 按馬號 + 負磅區間排序
-  wList.sort((a,b)=>{
-    const ha = Number(a.horse_no||0) - Number(b.horse_no||0);
-    if (ha !== 0) return ha;
-    return String(a.weight_zone||'').localeCompare(String(b.weight_zone||''));
-  });
-
-  tbodyWeight.innerHTML = wList.map(r => `
-    <tr>
-      <td>${r.horse_no ?? ''}</td>
-      <td>${r.horse_name_zh || ''}</td>
-      <td>${r.weight_zone || ''}</td>
-      <td>${r.runs ?? ''}</td>
-      <td>${r.win_cnt ?? ''}</td>
-      <td>${r.second_cnt ?? ''}</td>
-      <td>${r.third_cnt ?? ''}</td>
-      <td>${r.fourth_cnt ?? ''}</td>
-      <td>${pct(r.win_pct)}</td>
-      <td>${pct(r.q_pct)}</td>
-      <td>${pct(r.place_pct)}</td>
-      <td>${pct(r.top4_pct)}</td>
-      <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-      <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-      <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
-    </tr>
-    // 🆕 4) 馬匹檔位統計（由 race_combo_scores HORSE_DRAW_* 取得）
+  // 5) 馬匹檔位統計 (horseDrawTable, 之後由 /api/race/draw_stats 接駁)
   if (!state.drawComboStats || !state.drawComboStats.length) {
     try {
       const urlD = `/api/race/draw_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1111,37 +1111,29 @@ async function renderAnalysis(){
     }
   }
 
-  const dList = state.drawComboStats;
+  const dList = state.drawComboStats || [];
   if (!dList.length) {
     tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有馬匹檔位統計資料。</td></tr>`;
   } else {
-    // 按馬號排序
-    dList.sort((a, b) => Number(a.horse_no || 0) - Number(b.horse_no || 0));
+    dList.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
 
     tbodyHorseDraw.innerHTML = dList.map(r => {
-      // metric_code → 顯示文字：HORSE_DRAW_1_4 → 1–4 檔
       let drawBandText = '';
-      if (r.draw_band === 'HORSE_DRAW_1_4') drawBandText = '1–4 檔';
-      else if (r.draw_band === 'HORSE_DRAW_5_8') drawBandText = '5–8 檔';
+      if (r.draw_band === 'HORSE_DRAW_1_4')       drawBandText = '1–4 檔';
+      else if (r.draw_band === 'HORSE_DRAW_5_8')  drawBandText = '5–8 檔';
       else if (r.draw_band === 'HORSE_DRAW_9_14') drawBandText = '9–14 檔';
       else drawBandText = r.draw_band || '';
-
-      const runs  = r.runs || 0;
-      const win   = r.win_cnt || 0;
-      const p2    = r.second_cnt || 0;
-      const p3    = r.third_cnt || 0;
-      const p4    = r.fourth_cnt || 0;
 
       return `
         <tr>
           <td>${r.horse_no ?? ''}</td>
           <td>${r.horse_name_zh || ''}</td>
           <td>${drawBandText}</td>
-          <td>${runs}</td>
-          <td>${win}</td>
-          <td>${p2}</td>
-          <td>${p3}</td>
-          <td>${p4}</td>
+          <td>${r.runs ?? ''}</td>
+          <td>${r.win_cnt ?? ''}</td>
+          <td>${r.second_cnt ?? ''}</td>
+          <td>${r.third_cnt ?? ''}</td>
+          <td>${r.fourth_cnt ?? ''}</td>
           <td>${pct(r.win_pct)}</td>
           <td>${pct(r.q_pct)}</td>
           <td>${pct(r.place_pct)}</td>
@@ -1153,7 +1145,7 @@ async function renderAnalysis(){
       `;
     }).join('');
   }
-
+}
 
 // =========================
 // 9. 賽果
