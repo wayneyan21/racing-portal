@@ -616,6 +616,93 @@ app.get('/api/race/draw_stats', requireAuth, async (req, res) => {
   }
 });
 
+// 🆕 馬匹距離統計：只取「同場地 + 同距離」那條 HORSE_DIST_xxx
+// GET /api/race/distance_stats?date=YYYY-MM-DD&venue=ST&race_no=1
+app.get('/api/race/distance_stats', requireAuth, async (req, res) => {
+  if (!pool) {
+    console.error('[GET /api/race/distance_stats] pool not ready');
+    return res.status(503).json({ error: 'DB not ready' });
+  }
+
+  try {
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
+
+    // 1) 先搵今場距離（例如 1200）
+    const [raceRows] = await pool.query(
+      `
+      SELECT distance_m
+      FROM racecard_races
+      WHERE race_date  = ?
+        AND venue_code = ?
+        AND race_no    = ?
+      LIMIT 1
+      `,
+      [date, venue, Number(race_no)]
+    );
+
+    if (!raceRows.length) {
+      return res.json({ distance_m: null, items: [] });
+    }
+
+    const distance_m = raceRows[0].distance_m;
+    const metricCode = `HORSE_DIST_${venue}_${distance_m}`;
+
+    // 2) 喺 race_combo_scores 撈「今場、同場地、同距離」嗰條 HORSE_DIST_xxx
+    const sql = `
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        rc.metric_code                 AS dist_metric,   -- 例如 HORSE_DIST_ST_1200
+        rc.runs,
+        rc.win_cnt,
+        rc.second_cnt,
+        rc.third_cnt,
+        rc.fourth_cnt,
+        rc.win_pct,
+        rc.q_pct,
+        rc.place_pct,
+        rc.top4_pct,
+        rc.score_raw,
+        rc.score_norm,
+        rc.score_final
+      FROM race_combo_scores rc
+      JOIN racecard_entries e
+        ON rc.race_date = e.race_date
+       AND rc.race_no   = e.race_no
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
+      WHERE rc.race_date   = ?
+        AND rc.venue_code  = ?
+        AND rc.race_no     = ?
+        AND rc.metric_code = ?
+        AND (e.scratched IS NULL OR e.scratched = 0)
+      ORDER BY e.horse_no ASC
+    `;
+
+    const [rows] = await pool.query(sql, [
+      date,
+      venue,
+      Number(race_no),
+      metricCode,
+    ]);
+
+    return res.json({
+      race_date: date,
+      venue_code: venue,
+      race_no: Number(race_no),
+      distance_m,
+      metric_code: metricCode,
+      items: rows,   // 👈 前端直接 loop 呢個 items 用
+    });
+  } catch (err) {
+    console.error('[GET /api/race/distance_stats] SQL error:', err);
+    return res.status(500).json({ error: String(err.message || err) });
+  }
+});
+
 
 // 取得馬匹資料（最簡版）
 app.get('/api/horses', requireAuth, async (_req, res) => {
