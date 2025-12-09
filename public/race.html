@@ -583,9 +583,11 @@ const state = {
   results: [],         // 賽果
   weightStats: [],     // 負磅統計
   drawComboStats: [],  // 馬匹檔位統計（HORSE_DRAW_*）
-  horseDistStats: [],  // 🆕 馬匹路程統計（HORSE_DIST_*，只取今場距離）
-  horseDistMeta: null  // 🆕 { distance_m, metric_code }
+  horseDistStats: [],  // 馬匹路程統計（HORSE_DIST_*，只取今場距離）
+  horseDistMeta: null, // { distance_m, metric_code }
+  jockeyDistStats: []  // 🆕 騎師路程統計（JOCKEY_DIST_*）
 };
+
 
 
 // =========================
@@ -925,20 +927,22 @@ function pct(val){
 }
 
 async function renderAnalysis(){
-  const tbodyHorse     = document.querySelector('#analysisTable tbody');
-  const tbodyDraw      = document.querySelector('#drawTable tbody');
-  const tbodyWeight    = document.querySelector('#weightTable tbody');
-  const tbodyHorseDraw = document.querySelector('#horseDrawTable tbody');
-  const tbodyHorseDist = document.querySelector('#horseDistTable tbody'); // 🆕 馬匹路程
-
+  const tbodyHorse      = document.querySelector('#analysisTable tbody');
+  const tbodyDraw       = document.querySelector('#drawTable tbody');
+  const tbodyWeight     = document.querySelector('#weightTable tbody');
+  const tbodyHorseDraw  = document.querySelector('#horseDrawTable tbody');
+  const tbodyHorseDist  = document.querySelector('#horseDistTable tbody');  // 馬匹路程
+  const tbodyJockeyDist = document.querySelector('#jockeyDistTable tbody'); // 🆕 騎師路程
 
   // 1) 第一次入 tab：向後端拎 /api/race/horse_stats
-   if (!state.horseStats || !state.horseStats.length){
-    tbodyHorse.innerHTML     = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
-    tbodyDraw.innerHTML      = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
-    tbodyWeight.innerHTML    = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
-    tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
-    tbodyHorseDist.innerHTML = `<tr><td colspan="16" class="muted">載入中…</td></tr>`; // 🆕
+     if (!state.horseStats || !state.horseStats.length){
+    tbodyHorse.innerHTML      = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
+    tbodyDraw.innerHTML       = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyWeight.innerHTML     = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyHorseDraw.innerHTML  = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyHorseDist.innerHTML  = `<tr><td colspan="16" class="muted">載入中…</td></tr>`;
+    tbodyJockeyDist.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`; // 🆕
+
 
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -958,13 +962,16 @@ async function renderAnalysis(){
   }
 
   const list = state.horseStats;
-  if (!list.length){
+    if (!list.length){
     tbodyHorse.innerHTML     = `<tr><td colspan="14" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyDraw.innerHTML      = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyWeight.innerHTML    = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyHorseDist.innerHTML = `<tr><td colspan="16" class="muted">暫時沒有統計資料。</td></tr>`; // 🆕
+    tbodyJockeyDist.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`; // 🆕
     return;
   }
+
 
   // 用出馬名單 build「馬號 → entry」map（用嚟拎檔位）
   const entryByHorseNo = {};
@@ -1167,7 +1174,6 @@ async function renderAnalysis(){
       console.error('[race] distance_stats error', e);
       tbodyHorseDist.innerHTML = `<tr><td colspan="16" class="muted">暫時未能載入馬匹路程統計。</td></tr>`;
       // 唔好阻塞其他統計
-      return;
     }
   }
 
@@ -1187,6 +1193,53 @@ async function renderAnalysis(){
         <td>${r.horse_name_zh || ''}</td>
         <td>${venue}</td>
         <td>${distM ?? ''}</td>
+        <td>${r.runs ?? ''}</td>
+        <td>${r.win_cnt ?? ''}</td>
+        <td>${r.second_cnt ?? ''}</td>
+        <td>${r.third_cnt ?? ''}</td>
+        <td>${r.fourth_cnt ?? ''}</td>
+        <td>${pct(r.win_pct)}</td>
+        <td>${pct(r.q_pct)}</td>
+        <td>${pct(r.place_pct)}</td>
+        <td>${pct(r.top4_pct)}</td>
+        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+      </tr>
+    `).join('');
+  }
+    // 7) 騎師路程統計 (jockeyDistTable, 由 /api/race/jockey_dist_stats 提供)
+  if (!state.jockeyDistStats || !state.jockeyDistStats.length) {
+    try {
+      const urlJ = `/api/race/jockey_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
+      console.log('[race] fetch jockey_dist_stats:', urlJ);
+      const resJ  = await fetch(urlJ);
+      const rowsJ = await resJ.json();
+      state.jockeyDistStats = Array.isArray(rowsJ) ? rowsJ : [];
+    } catch (e) {
+      console.error('[race] jockey_dist_stats error', e);
+      tbodyJockeyDist.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入騎師路程統計。</td></tr>`;
+      // 呢度可以直接 return，因為再落去都只係騎師表
+      return;
+    }
+  }
+
+  const jList = state.jockeyDistStats || [];
+  if (!jList.length) {
+    tbodyJockeyDist.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有騎師路程統計資料。</td></tr>`;
+  } else {
+    // 先按騎師名，再按路程排
+    jList.sort((a, b) => {
+      const n1 = (a.jockey_zh || '').localeCompare(b.jockey_zh || '');
+      if (n1 !== 0) return n1;
+      return (a.distance_m || 0) - (b.distance_m || 0);
+    });
+
+    tbodyJockeyDist.innerHTML = jList.map(r => `
+      <tr>
+        <td>${r.jockey_zh || ''}</td>
+        <td>${r.venue || ''}</td>
+        <td>${r.distance_m ?? ''}</td>
         <td>${r.runs ?? ''}</td>
         <td>${r.win_cnt ?? ''}</td>
         <td>${r.second_cnt ?? ''}</td>
