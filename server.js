@@ -617,8 +617,7 @@ app.get('/api/race/draw_stats', requireAuth, async (req, res) => {
 });
 
 // 🆕 騎師路程統計：同一場比賽入面，每個騎師在「同場地＋同途程」嘅歷史表現
-// GET /api/race/jockey_dist_stats?date=YYYY-MM-DD&venue=ST&race_no=1
-app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
+app.get('/api/race/jockey_dist_stats', async (req, res) => {
   const { date, venue, race_no } = req.query;
 
   if (!date || !venue || !race_no) {
@@ -629,71 +628,69 @@ app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
   try {
     conn = await pool.getConnection();
 
-    // 1) 先搵今場距離
-    const [rRows] = await conn.query(
-      `SELECT distance_m FROM racecard_races
-       WHERE race_date=? AND venue_code=? AND race_no=? LIMIT 1`,
+    // 先拎今場途程（距離）
+    const [raceRows] = await conn.query(
+      `
+      SELECT distance_m
+      FROM racecard_races
+      WHERE race_date = ? AND venue_code = ? AND race_no = ?
+      LIMIT 1
+      `,
       [date, venue, Number(race_no)]
     );
 
-    if (!rRows.length) {
+    if (!raceRows.length) {
       return res.json([]);
     }
 
-    const distance_m = rRows[0].distance_m;
+    const distance_m = raceRows[0].distance_m;
     const metricCode = `JOCKEY_DIST_${venue}_${distance_m}`;
 
-    // 2) 查騎師路程統計
     const [rows] = await conn.query(
       `
       SELECT
-        e.jockey_zh,
-        rc.venue_code AS venue,
-        ? AS distance_m,
-
-        MAX(rc.runs)        AS runs,
-        MAX(rc.win_cnt)     AS win_cnt,
-        MAX(rc.second_cnt)  AS second_cnt,
-        MAX(rc.third_cnt)   AS third_cnt,
-        MAX(rc.fourth_cnt)  AS fourth_cnt,
-        MAX(rc.win_pct)     AS win_pct,
-        MAX(rc.q_pct)       AS q_pct,
-        MAX(rc.place_pct)   AS place_pct,
-        MAX(rc.top4_pct)    AS top4_pct,
-        MAX(rc.score_raw)   AS score_raw,
-        MAX(rc.score_norm)  AS score_norm,
-        MAX(rc.score_final) AS score_final
-
+        MAX(e.horse_no)          AS horse_no,        -- 🐎 今場馬號
+        MAX(e.horse_name_zh)     AS horse_name_zh,   -- 🐎 今場馬名
+        e.jockey_zh              AS jockey_zh,
+        rc.venue_code            AS venue,
+        ?                        AS distance_m,
+        MAX(rc.runs)             AS runs,
+        MAX(rc.win_cnt)          AS win_cnt,
+        MAX(rc.second_cnt)       AS second_cnt,
+        MAX(rc.third_cnt)        AS third_cnt,
+        MAX(rc.fourth_cnt)       AS fourth_cnt,
+        MAX(rc.win_pct)          AS win_pct,
+        MAX(rc.q_pct)            AS q_pct,
+        MAX(rc.place_pct)        AS place_pct,
+        MAX(rc.top4_pct)         AS top4_pct,
+        MAX(rc.score_raw)        AS score_raw,
+        MAX(rc.score_norm)       AS score_norm,
+        MAX(rc.score_final)      AS score_final
       FROM race_combo_scores rc
       JOIN racecard_entries e
         ON rc.race_date = e.race_date
        AND rc.race_no   = e.race_no
-       AND TRIM(rc.horse_id) COLLATE utf8mb4_unicode_ci =
-           TRIM(e.horse_id) COLLATE utf8mb4_unicode_ci
-
+       AND rc.horse_id  = e.horse_id
       WHERE rc.race_date   = ?
         AND rc.venue_code  = ?
         AND rc.race_no     = ?
         AND rc.metric_code = ?
         AND (e.scratched IS NULL OR e.scratched = 0)
-
       GROUP BY e.jockey_zh, rc.venue_code
-      ORDER BY e.jockey_zh
+      ORDER BY horse_no
       `,
       [
-        distance_m,         // 第一個 ?（顯示用）
+        distance_m,
         date,
         venue,
         Number(race_no),
-        metricCode          // JOCKEY_DIST_ST_1650
+        metricCode
       ]
     );
 
-    console.log('[jockey_dist_stats] return rows:', rows.length);
     res.json(rows);
-
   } catch (err) {
-    console.error('[api] jockey_dist_stats ERROR:', err);
+    console.error('[api] /api/race/jockey_dist_stats error:', err);
     res.status(500).json({ error: 'internal error' });
   } finally {
     if (conn) conn.release();
