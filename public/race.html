@@ -1274,7 +1274,7 @@ async function renderAnalysis(){
     `).join('');
   }
 
-  // 8) 練馬師路程統計 (trainerDistTable, /api/race/trainer_dist_stats)
+      // 8) 練馬師路程統計 (trainerDistTable, /api/race/trainer_dist_stats)
   if (!state.trainerDistStats || !state.trainerDistStats.length) {
     try {
       const urlT = `/api/race/trainer_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1284,7 +1284,8 @@ async function renderAnalysis(){
       state.trainerDistStats = Array.isArray(rowsT) ? rowsT : [];
     } catch (e) {
       console.error('[race] trainer_dist_stats error', e);
-      tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入練馬師路程統計。</td></tr>`;
+      tbodyTrainerDist.innerHTML =
+        `<tr><td colspan="17" class="muted">暫時未能載入練馬師路程統計。</td></tr>`;
       return;
     }
   }
@@ -1292,17 +1293,19 @@ async function renderAnalysis(){
   const tList = state.trainerDistStats || [];
   if (!tList.length) {
     tbodyTrainerDist.innerHTML =
-      `<tr><td colspan="15" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
+      `<tr><td colspan="17" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
   } else {
-    // 以練馬師名為主排序，其次按出馬次數多→少
+    // 先按馬號排序，再按練馬師名（同 jockeyDistTable 風格一致）
     tList.sort((a, b) => {
-      const nameCmp = (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
-      if (nameCmp !== 0) return nameCmp;
-      return (b.runs || 0) - (a.runs || 0);
+      const ha = Number(a.horse_no || 0) - Number(b.horse_no || 0);
+      if (ha !== 0) return ha;
+      return (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
     });
 
     tbodyTrainerDist.innerHTML = tList.map(r => `
       <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
         <td>${r.trainer_zh || ''}</td>
         <td>${r.venue || ''}</td>
         <td>${r.distance_m ?? ''}</td>
