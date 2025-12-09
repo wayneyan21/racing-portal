@@ -703,92 +703,75 @@ app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
   }
 });
 
-// 🆕 練馬師路程統計：同一場比賽入面，每個練馬師在「同場地＋同途程」嘅歷史表現
+// 🆕 練馬師路程統計：Trainer × Venue × Distance
 // GET /api/race/trainer_dist_stats?date=YYYY-MM-DD&venue=ST&race_no=1
 app.get('/api/race/trainer_dist_stats', requireAuth, async (req, res) => {
-  if (!pool) {
-    console.error('[api] /api/race/trainer_dist_stats pool not ready');
-    return res.status(503).json({ error: 'DB not ready' });
-  }
+  if (!pool) return res.status(503).json({ error: 'DB not ready' });
 
-  const { date, venue, race_no } = req.query;
-
-  if (!date || !venue || !race_no) {
-    return res.status(400).json({ error: 'missing date / venue / race_no' });
-  }
-
-  let conn;
   try {
-    conn = await pool.getConnection();
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
 
-    // 先拎今場途程（距離）
-    const [raceRows] = await conn.query(
-      `
-      SELECT distance_m
-      FROM racecard_races
-      WHERE race_date = ? AND venue_code = ? AND race_no = ?
-      LIMIT 1
-      `,
+    // 先取今場距離
+    const [[race]] = await pool.query(
+      `SELECT distance_m FROM racecard_races
+       WHERE race_date=? AND venue_code=? AND race_no=? LIMIT 1`,
       [date, venue, Number(race_no)]
     );
 
-    if (!raceRows.length) {
-      conn.release();
-      return res.json([]);
-    }
+    if (!race) return res.json([]);
 
-    const distance_m = raceRows[0].distance_m;
-    const metricCode = `TRAINER_DIST_${venue}_${distance_m}`;
+    const dist = race.distance_m;
+    const metricCode = `TRAINER_DIST_${venue}_${dist}`;
 
-    const [rows] = await conn.query(
-      `
+    // 主查詢：練馬師 + 馬匹（馬號 + 馬名）
+    const sql = `
       SELECT
-        MAX(e.horse_no)          AS horse_no,        -- 今場其中一匹馬號
-        MAX(e.horse_name_zh)     AS horse_name_zh,   -- 今場其中一匹馬名
-        e.trainer_zh             AS trainer_zh,
-        rc.venue_code            AS venue,
-        ?                        AS distance_m,
-        MAX(rc.runs)             AS runs,
-        MAX(rc.win_cnt)          AS win_cnt,
-        MAX(rc.second_cnt)       AS second_cnt,
-        MAX(rc.third_cnt)        AS third_cnt,
-        MAX(rc.fourth_cnt)       AS fourth_cnt,
-        MAX(rc.win_pct)          AS win_pct,
-        MAX(rc.q_pct)            AS q_pct,
-        MAX(rc.place_pct)        AS place_pct,
-        MAX(rc.top4_pct)         AS top4_pct,
-        MAX(rc.score_raw)        AS score_raw,
-        MAX(rc.score_norm)       AS score_norm,
-        MAX(rc.score_final)      AS score_final
+        e.horse_no,
+        e.horse_name_zh,
+        e.trainer_zh,
+        rc.venue_code,
+        ? AS distance_m,
+        rc.runs,
+        rc.win_cnt,
+        rc.second_cnt,
+        rc.third_cnt,
+        rc.fourth_cnt,
+        rc.win_pct,
+        rc.q_pct,
+        rc.place_pct,
+        rc.top4_pct,
+        rc.score_raw,
+        rc.score_norm,
+        rc.score_final
       FROM race_combo_scores rc
       JOIN racecard_entries e
         ON rc.race_date = e.race_date
        AND rc.race_no   = e.race_no
-       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
-           = e.horse_id COLLATE utf8mb4_unicode_ci
+       AND rc.horse_id  = e.horse_id
       WHERE rc.race_date   = ?
         AND rc.venue_code  = ?
         AND rc.race_no     = ?
         AND rc.metric_code = ?
         AND (e.scratched IS NULL OR e.scratched = 0)
-      GROUP BY e.trainer_zh, rc.venue_code
-      ORDER BY trainer_zh
-      `,
-      [
-        distance_m,
-        date,
-        venue,
-        Number(race_no),
-        metricCode,
-      ]
-    );
+      ORDER BY e.horse_no ASC
+    `;
 
-    conn.release();
-    return res.json(rows);
+    const [rows] = await pool.query(sql, [
+      dist,
+      date,
+      venue,
+      Number(race_no),
+      metricCode
+    ]);
+
+    res.json(rows);
+
   } catch (err) {
-    if (conn) conn.release();
-    console.error('[api] /api/race/trainer_dist_stats error:', err);
-    return res.status(500).json({ error: 'internal error' });
+    console.error('[GET /api/race/trainer_dist_stats] SQL error:', err);
+    res.status(500).json({ error: 'internal error' });
   }
 });
 
