@@ -617,7 +617,12 @@ app.get('/api/race/draw_stats', requireAuth, async (req, res) => {
 });
 
 // 🆕 騎師路程統計：同一場比賽入面，每個騎師在「同場地＋同途程」嘅歷史表現
-app.get('/api/race/jockey_dist_stats', async (req, res) => {
+app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
+  if (!pool) {
+    console.error('[GET /api/race/jockey_dist_stats] pool not ready');
+    return res.status(503).json({ error: 'DB not ready' });
+  }
+
   const { date, venue, race_no } = req.query;
 
   if (!date || !venue || !race_no) {
@@ -649,8 +654,8 @@ app.get('/api/race/jockey_dist_stats', async (req, res) => {
     const [rows] = await conn.query(
       `
       SELECT
-        MAX(e.horse_no)          AS horse_no,        -- 🐎 今場馬號
-        MAX(e.horse_name_zh)     AS horse_name_zh,   -- 🐎 今場馬名
+        MAX(e.horse_no)          AS horse_no,        -- 今場馬號
+        MAX(e.horse_name_zh)     AS horse_name_zh,   -- 今場馬名
         e.jockey_zh              AS jockey_zh,
         rc.venue_code            AS venue,
         ?                        AS distance_m,
@@ -670,7 +675,8 @@ app.get('/api/race/jockey_dist_stats', async (req, res) => {
       JOIN racecard_entries e
         ON rc.race_date = e.race_date
        AND rc.race_no   = e.race_no
-       AND rc.horse_id  = e.horse_id
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
       WHERE rc.race_date   = ?
         AND rc.venue_code  = ?
         AND rc.race_no     = ?
@@ -680,7 +686,7 @@ app.get('/api/race/jockey_dist_stats', async (req, res) => {
       ORDER BY horse_no
       `,
       [
-        distance_m,
+        distance_m,   // 對應 SELECT ? AS distance_m
         date,
         venue,
         Number(race_no),
