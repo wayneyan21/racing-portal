@@ -92,15 +92,15 @@
     <div class="tab active" data-tab="basic">基本資料</div>
     <div class="tab" data-tab="odds">賠率 / 投注池</div>
     <div class="tab" data-tab="runners">馬匹名單</div>
-    <div class="tab" data-tab="analysis">賽事分析</div> <!-- 🆕 -->
-    <div class="tab" data-tab="results">賽果</div>       <!-- 🆕 -->
+    <div class="tab" data-tab="analysis">賽事分析</div>
+    <div class="tab" data-tab="results">賽果</div>
   </div>
 
   <section class="panel active" id="panel-basic">
     <div class="cards" id="basicCards"></div>
   </section>
 
-  <!-- 賠率 panel：上面最新賠率，下面最近 10 筆 snapshot -->
+  <!-- 賠率 panel -->
   <section class="panel" id="panel-odds">
     <h3 style="margin:0 0 .4rem;">最新賠率</h3>
     <div class="table-wrap">
@@ -159,6 +159,7 @@
     </p>
   </section>
 
+  <!-- 馬匹名單 -->
   <section class="panel" id="panel-runners">
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table" id="runnersTable">
@@ -197,7 +198,7 @@
     </div>
   </section>
 
-    <!-- 🆕 賽事分析（全部統計 table 骨架） -->
+  <!-- 賽事分析 -->
   <section class="panel" id="panel-analysis">
     <!-- 1) 馬匹整體統計 -->
     <h3 class="section-title">
@@ -209,7 +210,7 @@
           <tr>
             <th>馬號</th>
             <th>馬名</th>
-            <th>次數</th> <!-- ＝出賽 -->
+            <th>次數</th>
             <th>冠</th>
             <th>亞</th>
             <th>季</th>
@@ -229,7 +230,7 @@
       </table>
     </div>
 
-    <!-- 2) 負磅統計（按今場負磅 level 歸類） -->
+    <!-- 2) 負磅統計 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       負磅統計 <span class="pill">按負磅區間歷史表現</span>
     </h3>
@@ -239,7 +240,7 @@
           <tr>
             <th>馬號</th>
             <th>馬名</th>
-            <th>負磅區間</th> <!-- 例如 &lt;120 / 120–129 / ≥130 -->
+            <th>負磅區間</th>
             <th>次數</th>
             <th>冠</th>
             <th>亞</th>
@@ -260,7 +261,7 @@
       </table>
     </div>
 
-    <!-- 3) 檔位統計（整體：同場地 / 路程 / 檔位歷史） -->
+    <!-- 3) 檔位統計 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       檔位統計 <span class="pill">同場地 / 路程歷史</span>
     </h3>
@@ -291,7 +292,7 @@
       </table>
     </div>
 
-    <!-- 3.5) 馬匹檔位統計（每匹馬自身在不同檔位的歷史） -->
+    <!-- 3.5) 馬匹檔位統計 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       馬匹檔位統計 <span class="pill">按馬匹拆分檔位表現</span>
     </h3>
@@ -360,32 +361,31 @@
     </h3>
     <div class="table-wrap" style="overflow-x:auto;">
       <table class="table" id="jockeyDistTable">
-  <thead>
-    <tr>
-      <th>馬號</th>
-      <th>馬名</th>
-      <th>騎師</th>
-      <th>場地</th>
-      <th>路程 (m)</th>
-      <th>騎乘次數</th>
-      <th>冠</th>
-      <th>亞</th>
-      <th>季</th>
-      <th>第4</th>
-      <th>勝出率%</th>
-      <th>入Q率%</th>
-      <th>入位率%</th>
-      <th>入四率%</th>
-      <th>得分</th>
-      <th>全部計%</th>
-      <th>10記綠＝50分</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr><td colspan="17" class="muted">暫未接駁騎師路程統計。</td></tr>
-  </tbody>
-</table>
-
+        <thead>
+          <tr>
+            <th>馬號</th>
+            <th>馬名</th>
+            <th>騎師</th>
+            <th>場地</th>
+            <th>路程 (m)</th>
+            <th>騎乘次數</th>
+            <th>冠</th>
+            <th>亞</th>
+            <th>季</th>
+            <th>第4</th>
+            <th>勝出率%</th>
+            <th>入Q率%</th>
+            <th>入位率%</th>
+            <th>入四率%</th>
+            <th>得分</th>
+            <th>全部計%</th>
+            <th>10記綠＝50分</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="17" class="muted">暫未接駁騎師路程統計。</td></tr>
+        </tbody>
+      </table>
     </div>
 
     <!-- 6) 練馬師路程統計 -->
@@ -416,12 +416,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="15" class="muted">暫未接駁練馬師路程統計。</td></tr>
+          <tr><td colspan="17" class="muted">暫未接駁練馬師路程統計。</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- 7) 人馬合作統計（騎師 × 馬匹） -->
+    <!-- 7) 人馬合作統計 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       人馬合作統計 <span class="pill">騎師 × 馬匹</span>
     </h3>
@@ -452,7 +452,7 @@
       </table>
     </div>
 
-    <!-- 8) 騎練路程統計（騎師 × 練馬師 × 路程） -->
+    <!-- 8) 騎練路程統計 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       騎練路程統計 <span class="pill">騎師 × 練馬師 × 場地 / 路程</span>
     </h3>
@@ -481,11 +481,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="16" class="muted">暫未接駁騎練路程統計。</td></tr>
+          <tr><td colspan="18" class="muted">暫未接駁騎練路程統計。</td></tr>
         </tbody>
       </table>
     </div>
-        <!-- 9) 綜合評分總覽（集合以上各項得分） -->
+
+    <!-- 9) 綜合評分總覽 -->
     <h3 class="section-title" style="margin-top:.9rem;">
       綜合評分總覽 <span class="pill">所有統計得分 + 總分</span>
     </h3>
@@ -495,27 +496,21 @@
           <tr>
             <th>馬號</th>
             <th>馬名</th>
-
-            <!-- 各個分析模塊的最終分數 -->
-            <th>馬匹整體分</th>      <!-- 來自 analysisTable / race_analysis_scores.horse_score_final -->
-            <th>負磅分</th>          <!-- 來自 weightTable / race_combo_scores (WEIGHT_*) -->
-            <th>檔位整體分</th>      <!-- 來自 drawTable / draw_score_final -->
-            <th>馬匹檔位分</th>      <!-- 來自 horseDrawTable -->
-            <th>馬匹路程分</th>      <!-- 來自 horseDistTable -->
-            <th>騎師路程分</th>      <!-- 來自 jockeyDistTable -->
-            <th>練馬師路程分</th>    <!-- 來自 trainerDistTable -->
-            <th>人馬合作分</th>      <!-- 來自 horseJockeyTable -->
-            <th>騎練路程分</th>      <!-- 來自 trainerJockeyDistTable -->
-
-            <!-- 最後一欄：綜合理論總分 -->
+            <th>馬匹整體分</th>
+            <th>負磅分</th>
+            <th>檔位整體分</th>
+            <th>馬匹檔位分</th>
+            <th>馬匹路程分</th>
+            <th>騎師路程分</th>
+            <th>練馬師路程分</th>
+            <th>人馬合作分</th>
+            <th>騎練路程分</th>
             <th>總分</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td colspan="12" class="muted">
-              暫未接駁綜合評分資料（之後可由各 table 分數加權計算）。
-            </td>
+            <td colspan="12" class="muted">載入中…</td>
           </tr>
         </tbody>
       </table>
@@ -527,8 +522,7 @@
     </p>
   </section>
 
-
-  <!-- 🆕 賽果 -->
+  <!-- 賽果 -->
   <section class="panel" id="panel-results">
     <h3 class="section-title">賽果</h3>
     <div class="table-wrap" style="overflow-x:auto;">
@@ -586,18 +580,17 @@ const state = {
     WIN: {},
     PLA: {}
   },
-  horseStats: [],      // 賽事分析用（馬匹 + 檔位）
-  results: [],         // 賽果
-  weightStats: [],     // 負磅統計
-  drawComboStats: [],  // 馬匹檔位統計（HORSE_DRAW_*）
-  horseDistStats: [],  // 馬匹路程統計（HORSE_DIST_*，只取今場距離）
-  horseDistMeta: null, // { distance_m, metric_code }
-  jockeyDistStats: [], // 騎師路程統計（JOCKEY_DIST_*）
-  trainerDistStats: [], // 🆕 練馬師路程統計（TRAINER_DIST_*）
-  trainerJockeyDistStats: [], // 🆕 騎練路程統計（TRAINER_JOCKEY_DIST_*）
-  horseJockeyStats: []  // 🆕 人馬合作統計（Horse × Jockey）
+  horseStats: [],
+  results: [],
+  weightStats: [],
+  drawComboStats: [],
+  horseDistStats: [],
+  horseDistMeta: null,
+  jockeyDistStats: [],
+  trainerDistStats: [],
+  trainerJockeyDistStats: [],
+  horseJockeyStats: []
 };
-
 
 // =========================
 // 3. 返回 / 重新載入
@@ -613,8 +606,6 @@ document.getElementById('btnBack').onclick = () => {
 
 document.getElementById('btnReload').onclick = async () => {
   await reloadAll();
-  // reloadAll 只會更新 meta / entries / odds
-  // 賽事分析 / 賽果可以之後再按 tab 重新載
   state.horseStats = [];
   state.results = [];
   state.weightStats = [];
@@ -622,7 +613,8 @@ document.getElementById('btnReload').onclick = async () => {
   state.horseDistStats = [];
   state.jockeyDistStats = [];
   state.trainerDistStats = [];
-  state.trainerJockeyDistStats = []; // 👈 加呢行
+  state.trainerJockeyDistStats = [];
+  state.horseJockeyStats = [];
   renderCurrentTab();
 };
 
@@ -657,7 +649,6 @@ function renderTabs(){
 // =========================
 // 5. 從後端取數據
 // =========================
-
 async function loadRaceMeta() {
   const url = `/api/racecard/races?date=${raceDate}&venue=${venue}`;
   console.log('[race] fetch meta:', url);
@@ -692,7 +683,7 @@ async function loadOddsHistory(type) {
   console.log('[race] fetch odds history:', type, url);
 
   const res  = await fetch(url);
-  const rows = await res.json(); // rows: [{horse_no, odds, snapshot_ts}, ...] 新→舊
+  const rows = await res.json();
 
   const timeKeys = [];
   const byHorse = {};
@@ -700,9 +691,7 @@ async function loadOddsHistory(type) {
   for (const r of rows || []) {
     const tsKey = r.snapshot_ts;
     if (!timeKeys.includes(tsKey)) {
-      if (timeKeys.length >= 10) {
-        continue;
-      }
+      if (timeKeys.length >= 10) continue;
       timeKeys.push(tsKey);
     }
     const no = r.horse_no;
@@ -928,17 +917,22 @@ function renderRunners() {
   }).join('');
 }
 
-
 // =========================
-// 8. 賽事分析（馬匹統計 + 檔位統計 + 負磅統計）
+// 8. 賽事分析
 // =========================
 function pct(val){
   if (val === null || val === undefined) return '';
   let num = Number(val);
   if (!Number.isFinite(num)) return '';
-  // 如果係 0–1，當係小數率，乘 100
   if (num >= 0 && num <= 1) num = num * 100;
   return num.toFixed(1);
+}
+
+function fmtScore(val, digits = 3){
+  if (val === null || val === undefined) return '';
+  const num = Number(val);
+  if (!Number.isFinite(num)) return '';
+  return num.toFixed(digits);
 }
 
 async function renderAnalysis(){
@@ -946,13 +940,14 @@ async function renderAnalysis(){
   const tbodyDraw       = document.querySelector('#drawTable tbody');
   const tbodyWeight     = document.querySelector('#weightTable tbody');
   const tbodyHorseDraw  = document.querySelector('#horseDrawTable tbody');
-  const tbodyHorseDist  = document.querySelector('#horseDistTable tbody');   // 馬匹路程
-  const tbodyJockeyDist = document.querySelector('#jockeyDistTable tbody');  // 騎師路程
-  const tbodyTrainerDist = document.querySelector('#trainerDistTable tbody'); // 🆕 練馬師路程
-  const tbodyHorseJockey = document.querySelector('#horseJockeyTable tbody'); // 🆕 人馬合作
-  const tbodyTrainerJockeyDist = document.querySelector('#trainerJockeyDistTable tbody'); // 騎練路程
+  const tbodyHorseDist  = document.querySelector('#horseDistTable tbody');
+  const tbodyJockeyDist = document.querySelector('#jockeyDistTable tbody');
+  const tbodyTrainerDist = document.querySelector('#trainerDistTable tbody');
+  const tbodyHorseJockey = document.querySelector('#horseJockeyTable tbody');
+  const tbodyTrainerJockeyDist = document.querySelector('#trainerJockeyDistTable tbody');
+  const tbodySummary = document.querySelector('#summaryTable tbody');
 
-  // 1) 第一次入 tab：向後端拎 /api/race/horse_stats
+  // 第一次入 tab 先 set loading
   if (!state.horseStats || !state.horseStats.length){
     tbodyHorse.innerHTML       = `<tr><td colspan="14" class="muted">載入中…</td></tr>`;
     tbodyDraw.innerHTML        = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
@@ -960,10 +955,10 @@ async function renderAnalysis(){
     tbodyHorseDraw.innerHTML   = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
     tbodyHorseDist.innerHTML   = `<tr><td colspan="16" class="muted">載入中…</td></tr>`;
     tbodyJockeyDist.innerHTML  = `<tr><td colspan="17" class="muted">載入中…</td></tr>`;
-    tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
-    tbodyHorseJockey.innerHTML  = `<tr><td colspan="15" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
+    tbodyTrainerDist.innerHTML = `<tr><td colspan="17" class="muted">載入中…</td></tr>`;
+    tbodyHorseJockey.innerHTML = `<tr><td colspan="16" class="muted">載入中…</td></tr>`;
     tbodyTrainerJockeyDist.innerHTML = `<tr><td colspan="18" class="muted">載入中…</td></tr>`;
-
+    tbodySummary.innerHTML     = `<tr><td colspan="12" class="muted">載入中…</td></tr>`;
 
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -980,7 +975,9 @@ async function renderAnalysis(){
       tbodyHorseDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時未能載入馬匹檔位統計。</td></tr>`;
       tbodyHorseDist.innerHTML  = `<tr><td colspan="16" class="muted">暫時未能載入馬匹路程統計。</td></tr>`;
       tbodyJockeyDist.innerHTML = `<tr><td colspan="17" class="muted">暫時未能載入騎師路程統計。</td></tr>`;
-      tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入練馬師路程統計。</td></tr>`;
+      tbodyTrainerDist.innerHTML = `<tr><td colspan="17" class="muted">暫時未能載入練馬師路程統計。</td></tr>`;
+      tbodyHorseJockey.innerHTML = `<tr><td colspan="16" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
+      tbodySummary.innerHTML     = `<tr><td colspan="12" class="muted">暫時未能載入綜合評分。</td></tr>`;
       return;
     }
   }
@@ -993,20 +990,20 @@ async function renderAnalysis(){
     tbodyHorseDraw.innerHTML  = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyHorseDist.innerHTML  = `<tr><td colspan="16" class="muted">暫時沒有統計資料。</td></tr>`;
     tbodyJockeyDist.innerHTML = `<tr><td colspan="17" class="muted">暫時沒有統計資料。</td></tr>`;
-    tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyTrainerDist.innerHTML = `<tr><td colspan="17" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodyHorseJockey.innerHTML = `<tr><td colspan="16" class="muted">暫時沒有統計資料。</td></tr>`;
+    tbodySummary.innerHTML     = `<tr><td colspan="12" class="muted">暫時沒有統計資料。</td></tr>`;
     return;
   }
 
-  // 用出馬名單 build「馬號 → entry」map（用嚟拎檔位）
   const entryByHorseNo = {};
   (state.entries || []).forEach(e => {
     entryByHorseNo[String(e.horse_no)] = e;
   });
 
-  // 按馬號排序
   list.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
 
-  // 2) 馬匹整體統計 (analysisTable)
+  // 2) 馬匹整體統計
   tbodyHorse.innerHTML = list.map(r => {
     const starts = r.starts ?? r.horse_runs ?? r.total_runs ?? '';
     const win    = r.win ?? r.win_cnt ?? 0;
@@ -1043,7 +1040,7 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // 3) 檔位統計 (drawTable)
+  // 3) 檔位統計
   tbodyDraw.innerHTML = list.map(r => {
     const horseNoKey = String(r.horse_no ?? '');
     const entry      = entryByHorseNo[horseNoKey] || {};
@@ -1085,7 +1082,7 @@ async function renderAnalysis(){
     `;
   }).join('');
 
-  // 4) 負磅統計 (weightTable, /api/race/weight_stats)
+  // 4) 負磅統計
   if (!state.weightStats || !state.weightStats.length) {
     try {
       const urlW = `/api/race/weight_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1096,7 +1093,6 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] weight_stats error', e);
       tbodyWeight.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入負磅統計。</td></tr>`;
-      // 負磅失敗唔阻住檔位 / 馬匹統計
     }
   }
 
@@ -1124,14 +1120,14 @@ async function renderAnalysis(){
         <td>${pct(r.q_pct)}</td>
         <td>${pct(r.place_pct)}</td>
         <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
       </tr>
     `).join('');
   }
 
-  // 5) 馬匹檔位統計 (horseDrawTable, /api/race/draw_stats)
+  // 5) 馬匹檔位統計
   if (!state.drawComboStats || !state.drawComboStats.length) {
     try {
       const urlD = `/api/race/draw_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1142,7 +1138,6 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] draw_stats error', e);
       tbodyHorseDraw.innerHTML = `<tr><td colspan="15" class="muted">暫時未能載入馬匹檔位統計。</td></tr>`;
-      return;
     }
   }
 
@@ -1173,15 +1168,15 @@ async function renderAnalysis(){
           <td>${pct(r.q_pct)}</td>
           <td>${pct(r.place_pct)}</td>
           <td>${pct(r.top4_pct)}</td>
-          <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-          <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-          <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+          <td>${fmtScore(r.score_raw)}</td>
+          <td>${fmtScore(r.score_norm)}</td>
+          <td>${fmtScore(r.score_final)}</td>
         </tr>
       `;
     }).join('');
   }
 
-  // 6) 馬匹路程統計 (horseDistTable, /api/race/distance_stats)
+  // 6) 馬匹路程統計
   if (!state.horseDistStats || !state.horseDistStats.length) {
     try {
       const urlDist = `/api/race/distance_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1189,7 +1184,6 @@ async function renderAnalysis(){
       const resDist  = await fetch(urlDist);
       const dataDist = await resDist.json();
 
-      // 後端回傳格式：{ race_date, venue_code, race_no, distance_m, metric_code, items: [...] }
       state.horseDistStats = Array.isArray(dataDist.items) ? dataDist.items : [];
       state.horseDistMeta  = {
         distance_m: dataDist.distance_m,
@@ -1198,7 +1192,6 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] distance_stats error', e);
       tbodyHorseDist.innerHTML = `<tr><td colspan="16" class="muted">暫時未能載入馬匹路程統計。</td></tr>`;
-      // 唔好阻塞其他統計
     }
   }
 
@@ -1209,7 +1202,6 @@ async function renderAnalysis(){
     const distMeta = state.horseDistMeta || {};
     const distM    = distMeta.distance_m || (state.raceMeta ? state.raceMeta.distance_m : '');
 
-    // 按馬號排
     distList.sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
 
     tbodyHorseDist.innerHTML = distList.map(r => `
@@ -1227,14 +1219,14 @@ async function renderAnalysis(){
         <td>${pct(r.q_pct)}</td>
         <td>${pct(r.place_pct)}</td>
         <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
       </tr>
     `).join('');
   }
 
-  // 7) 騎師路程統計 (jockeyDistTable, /api/race/jockey_dist_stats)
+  // 7) 騎師路程統計
   if (!state.jockeyDistStats || !state.jockeyDistStats.length) {
     try {
       const urlJ = `/api/race/jockey_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1245,7 +1237,6 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] jockey_dist_stats error', e);
       tbodyJockeyDist.innerHTML = `<tr><td colspan="17" class="muted">暫時未能載入騎師路程統計。</td></tr>`;
-      return;
     }
   }
 
@@ -1254,7 +1245,6 @@ async function renderAnalysis(){
     tbodyJockeyDist.innerHTML =
       `<tr><td colspan="17" class="muted">暫時沒有騎師路程統計資料。</td></tr>`;
   } else {
-    // 按馬號排，唔同馬號時再按騎師名
     jList.sort((a, b) => {
       const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
       if (ha !== 0) return ha;
@@ -1277,14 +1267,14 @@ async function renderAnalysis(){
         <td>${pct(r.q_pct)}</td>
         <td>${pct(r.place_pct)}</td>
         <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
       </tr>
     `).join('');
   }
 
-    // 8) 人馬合作統計 (horseJockeyTable, /api/race/horse_jockey_stats)
+  // 8) 人馬合作統計
   if (!state.horseJockeyStats || !state.horseJockeyStats.length) {
     try {
       const urlHJ = `/api/race/horse_jockey_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1295,17 +1285,15 @@ async function renderAnalysis(){
     } catch (e) {
       console.error('[race] horse_jockey_stats error', e);
       tbodyHorseJockey.innerHTML =
-        `<tr><td colspan="15" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
-      // 不中斷，之後仲會照樣畫騎練路程
+        `<tr><td colspan="16" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
     }
   }
 
   const hjList = state.horseJockeyStats || [];
   if (!hjList.length) {
     tbodyHorseJockey.innerHTML =
-      `<tr><td colspan="15" class="muted">暫時沒有人馬合作統計資料。</td></tr>`;
+      `<tr><td colspan="16" class="muted">暫時沒有人馬合作統計資料。</td></tr>`;
   } else {
-    // 先按馬號，再按騎師名排
     hjList.sort((a, b) => {
       const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
       if (ha !== 0) return ha;
@@ -1326,15 +1314,14 @@ async function renderAnalysis(){
         <td>${pct(r.q_pct)}</td>
         <td>${pct(r.place_pct)}</td>
         <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
       </tr>
     `).join('');
   }
 
-
-      // 9) 練馬師路程統計 (trainerDistTable, /api/race/trainer_dist_stats)
+  // 9) 練馬師路程統計
   if (!state.trainerDistStats || !state.trainerDistStats.length) {
     try {
       const urlT = `/api/race/trainer_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1346,46 +1333,44 @@ async function renderAnalysis(){
       console.error('[race] trainer_dist_stats error', e);
       tbodyTrainerDist.innerHTML =
         `<tr><td colspan="17" class="muted">暫時未能載入練馬師路程統計。</td></tr>`;
-      return;
     }
   }
 
   const tList = state.trainerDistStats || [];
-if (!tList.length) {
-  tbodyTrainerDist.innerHTML =
-    `<tr><td colspan="17" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
-} else {
-  // 可以保持依家排序邏輯，不影響顯示
-  tList.sort((a, b) => {
-    const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
-    if (ha !== 0) return ha;
-    return (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
-  });
+  if (!tList.length) {
+    tbodyTrainerDist.innerHTML =
+      `<tr><td colspan="17" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
+  } else {
+    tList.sort((a, b) => {
+      const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
+      if (ha !== 0) return ha;
+      return (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
+    });
 
-  tbodyTrainerDist.innerHTML = tList.map(r => `
-    <tr>
-      <td>${r.horse_no ?? ''}</td>
-      <td>${r.horse_name_zh || ''}</td>
-      <td>${r.trainer_zh || ''}</td>
-      <td>${r.venue || ''}</td>
-      <td>${r.distance_m ?? ''}</td>
-      <td>${r.runs ?? ''}</td>
-      <td>${r.win_cnt ?? ''}</td>
-      <td>${r.second_cnt ?? ''}</td>
-      <td>${r.third_cnt ?? ''}</td>
-      <td>${r.fourth_cnt ?? ''}</td>
-      <td>${pct(r.win_pct)}</td>
-      <td>${pct(r.q_pct)}</td>
-      <td>${pct(r.place_pct)}</td>
-      <td>${pct(r.top4_pct)}</td>
-      <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-      <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-      <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
-    </tr>
-  `).join('');
+    tbodyTrainerDist.innerHTML = tList.map(r => `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${r.trainer_zh || ''}</td>
+        <td>${r.venue || ''}</td>
+        <td>${r.distance_m ?? ''}</td>
+        <td>${r.runs ?? ''}</td>
+        <td>${r.win_cnt ?? ''}</td>
+        <td>${r.second_cnt ?? ''}</td>
+        <td>${r.third_cnt ?? ''}</td>
+        <td>${r.fourth_cnt ?? ''}</td>
+        <td>${pct(r.win_pct)}</td>
+        <td>${pct(r.q_pct)}</td>
+        <td>${pct(r.place_pct)}</td>
+        <td>${pct(r.top4_pct)}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
+      </tr>
+    `).join('');
   }
 
-    // 9) 騎練路程統計 (trainerJockeyDistTable, /api/race/trainer_jockey_dist_stats)
+  // 10) 騎練路程統計
   if (!state.trainerJockeyDistStats || !state.trainerJockeyDistStats.length) {
     try {
       const urlTJ = `/api/race/trainer_jockey_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1397,7 +1382,6 @@ if (!tList.length) {
       console.error('[race] trainer_jockey_dist_stats error', e);
       tbodyTrainerJockeyDist.innerHTML =
         `<tr><td colspan="18" class="muted">暫時未能載入騎練路程統計。</td></tr>`;
-      return;
     }
   }
 
@@ -1406,7 +1390,6 @@ if (!tList.length) {
     tbodyTrainerJockeyDist.innerHTML =
       `<tr><td colspan="18" class="muted">暫時沒有騎練路程統計資料。</td></tr>`;
   } else {
-    // 先按馬號、再按練馬師、再按騎師排序
     tjList.sort((a, b) => {
       const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
       if (ha !== 0) return ha;
@@ -1432,14 +1415,136 @@ if (!tList.length) {
         <td>${pct(r.q_pct)}</td>
         <td>${pct(r.place_pct)}</td>
         <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+        <td>${fmtScore(r.score_raw)}</td>
+        <td>${fmtScore(r.score_norm)}</td>
+        <td>${fmtScore(r.score_final)}</td>
       </tr>
     `).join('');
   }
 
+  // 11) 綜合評分總覽
+  const scoreMap = new Map();
 
+  function addScore(horseNo, horseName, key, val){
+    if (horseNo === null || horseNo === undefined) return;
+    if (val === null || val === undefined) return;
+    const num = Number(val);
+    if (!Number.isFinite(num)) return;
+
+    const k = String(horseNo);
+    let obj = scoreMap.get(k);
+    if (!obj) {
+      obj = {
+        horse_no: horseNo,
+        horse_name_zh: horseName || '',
+        horseScore: null,
+        weightScore: null,
+        drawScore: null,
+        horseDrawScore: null,
+        horseDistScore: null,
+        jockeyDistScore: null,
+        trainerDistScore: null,
+        horseJockeyScore: null,
+        trainerJockeyScore: null
+      };
+      scoreMap.set(k, obj);
+    }
+    if (obj[key] === null || obj[key] === undefined || num > obj[key]) {
+      obj[key] = num;
+    }
+  }
+
+  // 11.1 馬匹整體 / 檔位整體分
+  list.forEach(r => {
+    const no = r.horse_no;
+    const name = r.horse_name_zh || '';
+    const horseScore =
+      (r.green10 != null ? r.green10 :
+       (r.horse_score_final != null ? r.horse_score_final : null));
+    const drawScore =
+      (r.draw_green10 != null ? r.draw_green10 :
+       (r.draw_score_final != null ? r.draw_score_final : null));
+
+    addScore(no, name, 'horseScore', horseScore);
+    addScore(no, name, 'drawScore', drawScore);
+  });
+
+  // 11.2 負磅分
+  (state.weightStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'weightScore', r.score_final);
+  });
+
+  // 11.3 馬匹檔位分
+  (state.drawComboStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'horseDrawScore', r.score_final);
+  });
+
+  // 11.4 馬匹路程分
+  (state.horseDistStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'horseDistScore', r.score_final);
+  });
+
+  // 11.5 騎師路程分
+  (state.jockeyDistStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'jockeyDistScore', r.score_final);
+  });
+
+  // 11.6 練馬師路程分
+  (state.trainerDistStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'trainerDistScore', r.score_final);
+  });
+
+  // 11.7 人馬合作分
+  (state.horseJockeyStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'horseJockeyScore', r.score_final);
+  });
+
+  // 11.8 騎練路程分
+  (state.trainerJockeyDistStats || []).forEach(r => {
+    addScore(r.horse_no, r.horse_name_zh, 'trainerJockeyScore', r.score_final);
+  });
+
+  const summaryList = Array.from(scoreMap.values())
+    .sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
+
+  if (!summaryList.length){
+    tbodySummary.innerHTML =
+      `<tr><td colspan="12" class="muted">暫時沒有綜合評分資料。</td></tr>`;
+  } else {
+    tbodySummary.innerHTML = summaryList.map(r => {
+      const total = [
+        r.horseScore,
+        r.weightScore,
+        r.drawScore,
+        r.horseDrawScore,
+        r.horseDistScore,
+        r.jockeyDistScore,
+        r.trainerDistScore,
+        r.horseJockeyScore,
+        r.trainerJockeyScore
+      ].reduce((sum, x) => {
+        const n = Number(x);
+        return Number.isFinite(n) ? sum + n : sum;
+      }, 0);
+
+      return `
+        <tr>
+          <td>${r.horse_no ?? ''}</td>
+          <td>${r.horse_name_zh || ''}</td>
+          <td>${fmtScore(r.horseScore)}</td>
+          <td>${fmtScore(r.weightScore)}</td>
+          <td>${fmtScore(r.drawScore)}</td>
+          <td>${fmtScore(r.horseDrawScore)}</td>
+          <td>${fmtScore(r.horseDistScore)}</td>
+          <td>${fmtScore(r.jockeyDistScore)}</td>
+          <td>${fmtScore(r.trainerDistScore)}</td>
+          <td>${fmtScore(r.horseJockeyScore)}</td>
+          <td>${fmtScore(r.trainerJockeyScore)}</td>
+          <td>${fmtScore(total)}</td>
+        </tr>
+      `;
+    }).join('');
+  }
 }
 
 // =========================
@@ -1537,7 +1642,6 @@ reloadAll().then(() => {
   renderCurrentTab();
 });
 </script>
-
 
 </body>
 </html>
