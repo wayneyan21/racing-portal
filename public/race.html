@@ -594,7 +594,8 @@ const state = {
   horseDistMeta: null, // { distance_m, metric_code }
   jockeyDistStats: [], // 騎師路程統計（JOCKEY_DIST_*）
   trainerDistStats: [], // 🆕 練馬師路程統計（TRAINER_DIST_*）
-  trainerJockeyDistStats: [] // 🆕 騎練路程統計（TRAINER_JOCKEY_DIST_*）
+  trainerJockeyDistStats: [], // 🆕 騎練路程統計（TRAINER_JOCKEY_DIST_*）
+  horseJockeyStats: []  // 🆕 人馬合作統計（Horse × Jockey）
 };
 
 
@@ -948,7 +949,8 @@ async function renderAnalysis(){
   const tbodyHorseDist  = document.querySelector('#horseDistTable tbody');   // 馬匹路程
   const tbodyJockeyDist = document.querySelector('#jockeyDistTable tbody');  // 騎師路程
   const tbodyTrainerDist = document.querySelector('#trainerDistTable tbody'); // 🆕 練馬師路程
-  const tbodyTrainerJockeyDist = document.querySelector('#trainerJockeyDistTable tbody'); // 🆕 騎練路程
+  const tbodyHorseJockey = document.querySelector('#horseJockeyTable tbody'); // 🆕 人馬合作
+  const tbodyTrainerJockeyDist = document.querySelector('#trainerJockeyDistTable tbody'); // 騎練路程
 
   // 1) 第一次入 tab：向後端拎 /api/race/horse_stats
   if (!state.horseStats || !state.horseStats.length){
@@ -959,6 +961,7 @@ async function renderAnalysis(){
     tbodyHorseDist.innerHTML   = `<tr><td colspan="16" class="muted">載入中…</td></tr>`;
     tbodyJockeyDist.innerHTML  = `<tr><td colspan="17" class="muted">載入中…</td></tr>`;
     tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyHorseJockey.innerHTML  = `<tr><td colspan="15" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
     tbodyTrainerJockeyDist.innerHTML = `<tr><td colspan="18" class="muted">載入中…</td></tr>`;
 
 
@@ -1281,7 +1284,57 @@ async function renderAnalysis(){
     `).join('');
   }
 
-      // 8) 練馬師路程統計 (trainerDistTable, /api/race/trainer_dist_stats)
+    // 8) 人馬合作統計 (horseJockeyTable, /api/race/horse_jockey_stats)
+  if (!state.horseJockeyStats || !state.horseJockeyStats.length) {
+    try {
+      const urlHJ = `/api/race/horse_jockey_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
+      console.log('[race] fetch horse_jockey_stats:', urlHJ);
+      const resHJ  = await fetch(urlHJ);
+      const rowsHJ = await resHJ.json();
+      state.horseJockeyStats = Array.isArray(rowsHJ) ? rowsHJ : [];
+    } catch (e) {
+      console.error('[race] horse_jockey_stats error', e);
+      tbodyHorseJockey.innerHTML =
+        `<tr><td colspan="15" class="muted">暫時未能載入人馬合作統計。</td></tr>`;
+      // 不中斷，之後仲會照樣畫騎練路程
+    }
+  }
+
+  const hjList = state.horseJockeyStats || [];
+  if (!hjList.length) {
+    tbodyHorseJockey.innerHTML =
+      `<tr><td colspan="15" class="muted">暫時沒有人馬合作統計資料。</td></tr>`;
+  } else {
+    // 先按馬號，再按騎師名排
+    hjList.sort((a, b) => {
+      const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
+      if (ha !== 0) return ha;
+      return (a.jockey_zh || '').localeCompare(b.jockey_zh || '');
+    });
+
+    tbodyHorseJockey.innerHTML = hjList.map(r => `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${r.jockey_zh || ''}</td>
+        <td>${r.runs ?? ''}</td>
+        <td>${r.win_cnt ?? ''}</td>
+        <td>${r.second_cnt ?? ''}</td>
+        <td>${r.third_cnt ?? ''}</td>
+        <td>${r.fourth_cnt ?? ''}</td>
+        <td>${pct(r.win_pct)}</td>
+        <td>${pct(r.q_pct)}</td>
+        <td>${pct(r.place_pct)}</td>
+        <td>${pct(r.top4_pct)}</td>
+        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+      </tr>
+    `).join('');
+  }
+
+
+      // 9) 練馬師路程統計 (trainerDistTable, /api/race/trainer_dist_stats)
   if (!state.trainerDistStats || !state.trainerDistStats.length) {
     try {
       const urlT = `/api/race/trainer_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1385,6 +1438,8 @@ if (!tList.length) {
       </tr>
     `).join('');
   }
+
+
 }
 
 // =========================

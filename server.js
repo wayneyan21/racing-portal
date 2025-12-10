@@ -86,21 +86,21 @@ let pool;
 (async () => {
   try {
     console.log('DB config =>', {
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  database: process.env.DB_NAME,
-});
+      host: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      database: process.env.DB_NAME,
+    });
 
-pool = await mysql.createPool({
-  host: process.env.DB_HOST || '127.0.0.1',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'hkjc_db',
-  port: Number(process.env.DB_PORT || 3306),
-  waitForConnections: true,
-  connectionLimit: 10,
-});
+    pool = await mysql.createPool({
+      host: process.env.DB_HOST || '127.0.0.1',
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASS || process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'hkjc_db',
+      port: Number(process.env.DB_PORT || 3306),
+      waitForConnections: true,
+      connectionLimit: 10,
+    });
 
     console.log('✅ MySQL connected');
   } catch (e) {
@@ -616,6 +616,59 @@ app.get('/api/race/draw_stats', requireAuth, async (req, res) => {
   }
 });
 
+// 🆕 人馬合作統計：同一匹馬 + 同一騎師（HORSE_JOCKEY）
+// GET /api/race/horse_jockey_stats?date=YYYY-MM-DD&venue=ST&race_no=1
+app.get('/api/race/horse_jockey_stats', requireAuth, async (req, res) => {
+  if (!pool) {
+    console.error('[GET /api/race/horse_jockey_stats] pool not ready');
+    return res.status(503).json({ error: 'DB not ready' });
+  }
+
+  try {
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
+
+    const sql = `
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        e.jockey_zh,
+        rc.runs,
+        rc.win_cnt,
+        rc.second_cnt,
+        rc.third_cnt,
+        rc.fourth_cnt,
+        rc.win_pct,
+        rc.q_pct,
+        rc.place_pct,
+        rc.top4_pct,
+        rc.score_raw,
+        rc.score_norm,
+        rc.score_final
+      FROM race_combo_scores rc
+      JOIN racecard_entries e
+        ON rc.race_date = e.race_date
+       AND rc.race_no   = e.race_no
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
+      WHERE rc.race_date   = ?
+        AND rc.venue_code  = ?
+        AND rc.race_no     = ?
+        AND rc.metric_code = 'HORSE_JOCKEY'
+        AND (e.scratched IS NULL OR e.scratched = 0)
+      ORDER BY e.horse_no ASC
+    `;
+
+    const [rows] = await pool.query(sql, [date, venue, Number(race_no)]);
+    return res.json(rows);
+  } catch (err) {
+    console.error('[GET /api/race/horse_jockey_stats] SQL error:', err);
+    return res.status(500).json({ error: 'internal error' });
+  }
+});
+
 // 🆕 騎師路程統計：同一場比賽入面，每個騎師在「同場地＋同途程」嘅歷史表現
 app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
   if (!pool) {
@@ -844,6 +897,64 @@ app.get('/api/race/trainer_jockey_dist_stats', requireAuth, async (req, res) => 
   } catch (err) {
     console.error('[GET /api/race/trainer_jockey_dist_stats] SQL error:', err);
     res.status(500).json({ error: 'internal error' });
+  }
+});
+
+// 🆕 人馬合作統計：Horse × Jockey 組合歷史
+// GET /api/race/horse_jockey_stats?date=YYYY-MM-DD&venue=ST&race_no=1
+app.get('/api/race/horse_jockey_stats', requireAuth, async (req, res) => {
+  if (!pool) {
+    console.error('[GET /api/race/horse_jockey_stats] pool not ready');
+    return res.status(503).json({ error: 'DB not ready' });
+  }
+
+  try {
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
+
+    const sql = `
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        e.jockey_zh,
+        rc.runs,
+        rc.win_cnt,
+        rc.second_cnt,
+        rc.third_cnt,
+        rc.fourth_cnt,
+        rc.win_pct,
+        rc.q_pct,
+        rc.place_pct,
+        rc.top4_pct,
+        rc.score_raw,
+        rc.score_norm,
+        rc.score_final
+      FROM race_combo_scores rc
+      JOIN racecard_entries e
+        ON rc.race_date = e.race_date
+       AND rc.race_no   = e.race_no
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
+      WHERE rc.race_date   = ?
+        AND rc.venue_code  = ?
+        AND rc.race_no     = ?
+        AND rc.metric_code = 'HORSE_JOCKEY'
+        AND (e.scratched IS NULL OR e.scratched = 0)
+      ORDER BY e.horse_no ASC, e.jockey_zh
+    `;
+
+    const [rows] = await pool.query(sql, [
+      date,
+      venue,
+      Number(race_no),
+    ]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('[GET /api/race/horse_jockey_stats] SQL error:', err);
+    return res.status(500).json({ error: 'internal error' });
   }
 });
 
