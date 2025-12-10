@@ -460,6 +460,8 @@
       <table class="table" id="trainerJockeyDistTable">
         <thead>
           <tr>
+            <th>馬號</th>
+            <th>馬名</th>
             <th>練馬師</th>
             <th>騎師</th>
             <th>場地</th>
@@ -592,6 +594,7 @@ const state = {
   horseDistMeta: null, // { distance_m, metric_code }
   jockeyDistStats: [], // 騎師路程統計（JOCKEY_DIST_*）
   trainerDistStats: [] // 🆕 練馬師路程統計（TRAINER_DIST_*）
+  trainerJockeyDistStats: [] // 🆕 騎練路程統計（TRAINER_JOCKEY_DIST_*）
 };
 
 
@@ -618,6 +621,7 @@ document.getElementById('btnReload').onclick = async () => {
   state.horseDistStats = [];
   state.jockeyDistStats = [];
   state.trainerDistStats = [];
+  state.trainerJockeyDistStats = []; // 👈 加呢行
   renderCurrentTab();
 };
 
@@ -944,6 +948,7 @@ async function renderAnalysis(){
   const tbodyHorseDist  = document.querySelector('#horseDistTable tbody');   // 馬匹路程
   const tbodyJockeyDist = document.querySelector('#jockeyDistTable tbody');  // 騎師路程
   const tbodyTrainerDist = document.querySelector('#trainerDistTable tbody'); // 🆕 練馬師路程
+  const tbodyTrainerJockeyDist = document.querySelector('#trainerJockeyDistTable tbody'); // 🆕 騎練路程
 
   // 1) 第一次入 tab：向後端拎 /api/race/horse_stats
   if (!state.horseStats || !state.horseStats.length){
@@ -954,6 +959,8 @@ async function renderAnalysis(){
     tbodyHorseDist.innerHTML   = `<tr><td colspan="16" class="muted">載入中…</td></tr>`;
     tbodyJockeyDist.innerHTML  = `<tr><td colspan="17" class="muted">載入中…</td></tr>`;
     tbodyTrainerDist.innerHTML = `<tr><td colspan="15" class="muted">載入中…</td></tr>`;
+    tbodyTrainerJockeyDist.innerHTML = `<tr><td colspan="18" class="muted">載入中…</td></tr>`;
+
 
     try{
       const url = `/api/race/horse_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
@@ -1323,6 +1330,60 @@ if (!tList.length) {
       <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
     </tr>
   `).join('');
+  }
+
+    // 9) 騎練路程統計 (trainerJockeyDistTable, /api/race/trainer_jockey_dist_stats)
+  if (!state.trainerJockeyDistStats || !state.trainerJockeyDistStats.length) {
+    try {
+      const urlTJ = `/api/race/trainer_jockey_dist_stats?date=${raceDate}&venue=${venue}&race_no=${raceNo}`;
+      console.log('[race] fetch trainer_jockey_dist_stats:', urlTJ);
+      const resTJ  = await fetch(urlTJ);
+      const rowsTJ = await resTJ.json();
+      state.trainerJockeyDistStats = Array.isArray(rowsTJ) ? rowsTJ : [];
+    } catch (e) {
+      console.error('[race] trainer_jockey_dist_stats error', e);
+      tbodyTrainerJockeyDist.innerHTML =
+        `<tr><td colspan="18" class="muted">暫時未能載入騎練路程統計。</td></tr>`;
+      return;
+    }
+  }
+
+  const tjList = state.trainerJockeyDistStats || [];
+  if (!tjList.length) {
+    tbodyTrainerJockeyDist.innerHTML =
+      `<tr><td colspan="18" class="muted">暫時沒有騎練路程統計資料。</td></tr>`;
+  } else {
+    // 先按馬號、再按練馬師、再按騎師排序
+    tjList.sort((a, b) => {
+      const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
+      if (ha !== 0) return ha;
+      const ta = (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
+      if (ta !== 0) return ta;
+      return (a.jockey_zh || '').localeCompare(b.jockey_zh || '');
+    });
+
+    tbodyTrainerJockeyDist.innerHTML = tjList.map(r => `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td>${r.trainer_zh || ''}</td>
+        <td>${r.jockey_zh || ''}</td>
+        <td>${r.venue || ''}</td>
+        <td>${r.distance_m ?? ''}</td>
+        <td>${r.runs ?? ''}</td>
+        <td>${r.win_cnt ?? ''}</td>
+        <td>${r.second_cnt ?? ''}</td>
+        <td>${r.third_cnt ?? ''}</td>
+        <td>${r.fourth_cnt ?? ''}</td>
+        <td>${pct(r.win_pct)}</td>
+        <td>${pct(r.q_pct)}</td>
+        <td>${pct(r.place_pct)}</td>
+        <td>${pct(r.top4_pct)}</td>
+        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+      </tr>
+    `).join('');
   }
 }
 
