@@ -774,6 +774,79 @@ app.get('/api/race/trainer_dist_stats', requireAuth, async (req, res) => {
   }
 });
 
+// 🆕 騎練路程統計：Trainer × Jockey × Venue × Distance
+app.get('/api/race/trainer_jockey_dist_stats', requireAuth, async (req, res) => {
+  if (!pool) {
+    console.error('[GET /api/race/trainer_jockey_dist_stats] pool not ready');
+    return res.status(503).json({ error: 'DB not ready' });
+  }
+
+  try {
+    const { date, venue, race_no } = req.query;
+    if (!date || !venue || !race_no) {
+      return res.status(400).json({ error: 'missing date / venue / race_no' });
+    }
+
+    // 先取今場距離
+    const [[race]] = await pool.query(
+      `SELECT distance_m FROM racecard_races
+       WHERE race_date=? AND venue_code=? AND race_no=? LIMIT 1`,
+      [date, venue, Number(race_no)]
+    );
+    if (!race) return res.json([]);
+
+    const dist = race.distance_m;
+    const metricCode = `TRAINER_JOCKEY_DIST_${venue}_${dist}`;
+
+    const sql = `
+      SELECT
+        e.horse_no,
+        e.horse_name_zh,
+        e.trainer_zh,
+        e.jockey_zh,
+        rc.venue_code        AS venue,
+        ?                    AS distance_m,
+        rc.runs,
+        rc.win_cnt,
+        rc.second_cnt,
+        rc.third_cnt,
+        rc.fourth_cnt,
+        rc.win_pct,
+        rc.q_pct,
+        rc.place_pct,
+        rc.top4_pct,
+        rc.score_raw,
+        rc.score_norm,
+        rc.score_final
+      FROM race_combo_scores rc
+      JOIN racecard_entries e
+        ON rc.race_date = e.race_date
+       AND rc.race_no   = e.race_no
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
+      WHERE rc.race_date   = ?
+        AND rc.venue_code  = ?
+        AND rc.race_no     = ?
+        AND rc.metric_code = ?
+        AND (e.scratched IS NULL OR e.scratched = 0)
+      ORDER BY e.horse_no ASC, e.trainer_zh, e.jockey_zh
+    `;
+
+    const [rows] = await pool.query(sql, [
+      dist,
+      date,
+      venue,
+      Number(race_no),
+      metricCode
+    ]);
+
+    res.json(rows);
+  } catch (err) {
+    console.error('[GET /api/race/trainer_jockey_dist_stats] SQL error:', err);
+    res.status(500).json({ error: 'internal error' });
+  }
+});
+
 
 // 🆕 馬匹距離統計：只取「同場地 + 同距離」那條 HORSE_DIST_xxx
 // GET /api/race/distance_stats?date=YYYY-MM-DD&venue=ST&race_no=1
