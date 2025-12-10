@@ -1291,38 +1291,38 @@ async function renderAnalysis(){
   }
 
   const tList = state.trainerDistStats || [];
-  if (!tList.length) {
-    tbodyTrainerDist.innerHTML =
-      `<tr><td colspan="17" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
-  } else {
-    // 先按馬號排序，再按練馬師名（同 jockeyDistTable 風格一致）
-    tList.sort((a, b) => {
-      const ha = Number(a.horse_no || 0) - Number(b.horse_no || 0);
-      if (ha !== 0) return ha;
-      return (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
-    });
+if (!tList.length) {
+  tbodyTrainerDist.innerHTML =
+    `<tr><td colspan="17" class="muted">暫時沒有練馬師路程統計資料。</td></tr>`;
+} else {
+  // 可以保持依家排序邏輯，不影響顯示
+  tList.sort((a, b) => {
+    const ha = (Number(a.horse_no || 0) - Number(b.horse_no || 0));
+    if (ha !== 0) return ha;
+    return (a.trainer_zh || '').localeCompare(b.trainer_zh || '');
+  });
 
-    tbodyTrainerDist.innerHTML = tList.map(r => `
-      <tr>
-        <td>${r.horse_no ?? ''}</td>
-        <td>${r.horse_name_zh || ''}</td>
-        <td>${r.trainer_zh || ''}</td>
-        <td>${r.venue || ''}</td>
-        <td>${r.distance_m ?? ''}</td>
-        <td>${r.runs ?? ''}</td>
-        <td>${r.win_cnt ?? ''}</td>
-        <td>${r.second_cnt ?? ''}</td>
-        <td>${r.third_cnt ?? ''}</td>
-        <td>${r.fourth_cnt ?? ''}</td>
-        <td>${pct(r.win_pct)}</td>
-        <td>${pct(r.q_pct)}</td>
-        <td>${pct(r.place_pct)}</td>
-        <td>${pct(r.top4_pct)}</td>
-        <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
-        <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
-        <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
-      </tr>
-    `).join('');
+  tbodyTrainerDist.innerHTML = tList.map(r => `
+    <tr>
+      <td>${r.horse_no ?? ''}</td>
+      <td>${r.horse_name_zh || ''}</td>
+      <td>${r.trainer_zh || ''}</td>
+      <td>${r.venue || ''}</td>
+      <td>${r.distance_m ?? ''}</td>
+      <td>${r.runs ?? ''}</td>
+      <td>${r.win_cnt ?? ''}</td>
+      <td>${r.second_cnt ?? ''}</td>
+      <td>${r.third_cnt ?? ''}</td>
+      <td>${r.fourth_cnt ?? ''}</td>
+      <td>${pct(r.win_pct)}</td>
+      <td>${pct(r.q_pct)}</td>
+      <td>${pct(r.place_pct)}</td>
+      <td>${pct(r.top4_pct)}</td>
+      <td>${r.score_raw   != null ? Number(r.score_raw).toFixed(3)   : ''}</td>
+      <td>${r.score_norm  != null ? Number(r.score_norm).toFixed(3)  : ''}</td>
+      <td>${r.score_final != null ? Number(r.score_final).toFixed(3) : ''}</td>
+    </tr>
+  `).join('');
   }
 }
 

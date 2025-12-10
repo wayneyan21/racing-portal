@@ -704,7 +704,6 @@ app.get('/api/race/jockey_dist_stats', requireAuth, async (req, res) => {
 });
 
 // 🆕 練馬師路程統計：Trainer × Venue × Distance
-// GET /api/race/trainer_dist_stats?date=YYYY-MM-DD&venue=ST&race_no=1
 app.get('/api/race/trainer_dist_stats', requireAuth, async (req, res) => {
   if (!pool) return res.status(503).json({ error: 'DB not ready' });
 
@@ -724,16 +723,16 @@ app.get('/api/race/trainer_dist_stats', requireAuth, async (req, res) => {
     if (!race) return res.json([]);
 
     const dist = race.distance_m;
-    const metricCode = `TRAINER_DIST_${venue}_${dist}`;
+    // 只要求開頭係 TRAINER_DIST_場地_，尾段點寫都照收
+    const metricLike = `TRAINER_DIST_${venue}_%`;
 
-    // 主查詢：練馬師 + 馬匹（馬號 + 馬名）
     const sql = `
       SELECT
         e.horse_no,
         e.horse_name_zh,
         e.trainer_zh,
-        rc.venue_code,
-        ? AS distance_m,
+        rc.venue_code        AS venue,
+        ?                    AS distance_m,
         rc.runs,
         rc.win_cnt,
         rc.second_cnt,
@@ -750,25 +749,25 @@ app.get('/api/race/trainer_dist_stats', requireAuth, async (req, res) => {
       JOIN racecard_entries e
         ON rc.race_date = e.race_date
        AND rc.race_no   = e.race_no
-       AND rc.horse_id  = e.horse_id
+       AND rc.horse_id  COLLATE utf8mb4_unicode_ci
+           = e.horse_id COLLATE utf8mb4_unicode_ci
       WHERE rc.race_date   = ?
         AND rc.venue_code  = ?
         AND rc.race_no     = ?
-        AND rc.metric_code = ?
+        AND rc.metric_code LIKE ?
         AND (e.scratched IS NULL OR e.scratched = 0)
       ORDER BY e.horse_no ASC
     `;
 
     const [rows] = await pool.query(sql, [
-      dist,
+      dist,          // 對應 SELECT ? AS distance_m
       date,
       venue,
       Number(race_no),
-      metricCode
+      metricLike
     ]);
 
     res.json(rows);
-
   } catch (err) {
     console.error('[GET /api/race/trainer_dist_stats] SQL error:', err);
     res.status(500).json({ error: 'internal error' });
