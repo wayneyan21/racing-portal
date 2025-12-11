@@ -72,6 +72,23 @@
     color:#ffb347;
     font-weight:600;
   }
+    /* 綜合評分總覽 Top 1–5 顏色 */
+  .rank-top1 {  /* 第 1 名：紅色 */
+    background-color: #ffd6d6 !important;
+  }
+  .rank-top2 {  /* 第 2 名：橙色 */
+    background-color: #ffe6c7 !important;
+  }
+  .rank-top3 {  /* 第 3 名：藍色 */
+    background-color: #d6e7ff !important;
+  }
+  .rank-top4 {  /* 第 4 名：綠色 */
+    background-color: #dff5d8 !important;
+  }
+  .rank-top5 {  /* 第 5 名：紫色 */
+    background-color: #ead6ff !important;
+  }
+
 </style>
 </head>
 <body>
@@ -1445,7 +1462,8 @@ async function renderAnalysis(){
         jockeyDistScore: null,
         trainerDistScore: null,
         horseJockeyScore: null,
-        trainerJockeyScore: null
+        trainerJockeyScore: null,
+        totalScore: 0
       };
       scoreMap.set(k, obj);
     }
@@ -1524,14 +1542,15 @@ async function renderAnalysis(){
     addScore(r.horse_no, r.horse_name_zh, 'trainerJockeyScore', s);
   });
 
-  const summaryList = Array.from(scoreMap.values())
-    .sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
+  // === 計 totalScore，同時準備排名用 ===
+  const summaryList = Array.from(scoreMap.values());
 
   if (!summaryList.length){
     tbodySummary.innerHTML =
       `<tr><td colspan="12" class="muted">暫時沒有綜合評分資料。</td></tr>`;
   } else {
-    tbodySummary.innerHTML = summaryList.map(r => {
+    // 先計每匹馬 totalScore
+    summaryList.forEach(r => {
       const total = [
         r.horseScore,
         r.weightScore,
@@ -1546,9 +1565,39 @@ async function renderAnalysis(){
         const n = Number(x);
         return Number.isFinite(n) ? sum + n : sum;
       }, 0);
+      r.totalScore = total;
+    });
+
+    // 按 totalScore 由高至低排，拎出排名
+    const sortedByTotal = [...summaryList].sort(
+      (a, b) => (b.totalScore || 0) - (a.totalScore || 0)
+    );
+
+    const rankByHorseNo = new Map();
+    sortedByTotal.forEach((r, idx) => {
+      if (Number.isFinite(r.totalScore) && r.totalScore > 0) {
+        rankByHorseNo.set(String(r.horse_no), idx + 1); // 第 1 名 = 1
+      }
+    });
+
+    // 顯示時仍然用馬號排序
+    summaryList.sort(
+      (a, b) => Number(a.horse_no || 0) - Number(b.horse_no || 0)
+    );
+
+    tbodySummary.innerHTML = summaryList.map(r => {
+      const total = r.totalScore || 0;
+      const rank = rankByHorseNo.get(String(r.horse_no));
+
+      let rowClass = '';
+      if (rank === 1) rowClass = 'rank-top1';
+      else if (rank === 2) rowClass = 'rank-top2';
+      else if (rank === 3) rowClass = 'rank-top3';
+      else if (rank === 4) rowClass = 'rank-top4';
+      else if (rank === 5) rowClass = 'rank-top5';
 
       return `
-        <tr>
+        <tr class="${rowClass}">
           <td>${r.horse_no ?? ''}</td>
           <td>${r.horse_name_zh || ''}</td>
           <td>${fmtScore(r.horseScore)}</td>
