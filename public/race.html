@@ -5,24 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>賽事詳情 - HKJC 面板</title>
 <style>
+  /* 一律用白底黑字，唔再跟系統深淺色 */
   :root{
-    --bg: #0f1115;
-    --panel: #171a21;
-    --muted: #9aa4b2;
-    --text: #e6ebf2;
-    --primary: #4da3ff;
-    --accent: #7ee081;
-    --danger: #ff6b6b;
-    --border: #2a2f3a;
+    --bg: #f6f7fb;
+    --panel:#ffffff;
+    --muted:#5e6a77;
+    --text:#1b2430;
+    --primary:#1864ff;
+    --accent:#129b45;
+    --danger:#c42525;
+    --border:#e7eaf0;
   }
-  @media (prefers-color-scheme: light){
-    :root{
-      --bg: #f6f7fb; --panel:#fff; --muted:#5e6a77; --text:#1b2430;
-      --primary:#1864ff; --accent:#129b45; --danger:#c42525; --border:#e7eaf0;
-    }
-  }
+
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto;
+  }
 
   .appbar{position:sticky;top:0;z-index:40;background:var(--panel);border-bottom:1px solid var(--border)}
   .appbar .row{display:flex;align-items:center;gap:.75rem;padding:.6rem 1rem}
@@ -33,7 +34,7 @@
   main{padding:1rem}
   .tabs{display:flex;gap:.25rem;border-bottom:1px solid var(--border);padding:.2rem}
   .tab{padding:.55rem .9rem;border-radius:.55rem;cursor:pointer;color:var(--muted)}
-  .tab.active{background:rgba(77,163,255,.15);color:var(--text)}
+  .tab.active{background:rgba(24,100,255,.08);color:var(--text)}
   .panel{display:none;padding:1rem 0}
   .panel.active{display:block}
 
@@ -44,17 +45,18 @@
 
   .table-wrap{background:var(--panel);border:1px solid var(--border);border-radius:.8rem;overflow:hidden}
   .table{width:100%;border-collapse:collapse}
-  .table th,.table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:.4rem .6rem;border-bottom:1px solid rgba(255,255,255,.03)}
+  .table th,.table td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:.4rem .6rem;border-bottom:1px solid rgba(0,0,0,.03)}
   .table th{color:var(--muted);font-weight:600;font-size:12px}
-  .table tr:nth-child(even){background:rgba(255,255,255,0.02)}
+  .table tr:nth-child(even){background:rgba(0,0,0,0.015)}
 
   .section-title{margin:.3rem 0 .4rem;font-size:15px;font-weight:600}
-  .pill{display:inline-flex;align-items:center;padding:0 .5rem;border-radius:999px;background:rgba(77,163,255,.18);color:var(--primary);font-size:11px;margin-left:.4rem}
+  .pill{display:inline-flex;align-items:center;padding:0 .5rem;border-radius:999px;background:rgba(24,100,255,.08);color:var(--primary);font-size:11px;margin-left:.4rem}
 
   @media (max-width:600px){
     .kv{grid-template-columns:1fr}
     .table-wrap{overflow-x:auto}
   }
+
   .odds-grid-wrapper{
     display:grid;
     grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
@@ -65,11 +67,11 @@
   .table td.odds-empty{color:var(--muted);font-size:12px}
   .table td.odds-cell small{display:block;font-size:11px;color:var(--muted)}
   .odds-cell-hot{
-    color:#ff6b6b;
+    color:#c42525;
     font-weight:600;
   }
   .odds-cell-warm{
-    color:#ffb347;
+    color:#d98a00;
     font-weight:600;
   }
     /* 綜合評分總覽 Top 1–5 顏色 */
