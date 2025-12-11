@@ -89,6 +89,29 @@
     background-color: #ead6ff !important;
   }
 
+  /* 綜合評分總覽：每一個項目自己排名顏色（字用黑色） */
+#summaryTable td.score-r1{
+  background:#ffd6d6;   /* 第一名：紅粉 */
+  color:#111 !important;
+}
+#summaryTable td.score-r2{
+  background:#ffe4c4;   /* 第二名：橙粉 */
+  color:#111 !important;
+}
+#summaryTable td.score-r3{
+  background:#dbe7ff;   /* 第三名：藍粉 */
+  color:#111 !important;
+}
+#summaryTable td.score-r4{
+  background:#e3f7d9;   /* 第四名：綠粉 */
+  color:#111 !important;
+}
+#summaryTable td.score-r5{
+  background:#eee2ff;   /* 第五名：紫粉 */
+  color:#111 !important;
+}
+
+
 </style>
 </head>
 <body>
@@ -1439,7 +1462,7 @@ async function renderAnalysis(){
     `).join('');
   }
 
-  // 11) 綜合評分總覽（全部以 score / score_raw 為主）
+    // 11) 綜合評分總覽（全部以 score / score_raw 為主）
   const scoreMap = new Map();
 
   function addScore(horseNo, horseName, key, val){
@@ -1463,10 +1486,11 @@ async function renderAnalysis(){
         trainerDistScore: null,
         horseJockeyScore: null,
         trainerJockeyScore: null,
-        totalScore: 0
+        totalScore: null
       };
       scoreMap.set(k, obj);
     }
+    // 同一匹馬，如果有多個值，用最大嗰個
     if (obj[key] === null || obj[key] === undefined || num > obj[key]) {
       obj[key] = num;
     }
@@ -1542,77 +1566,91 @@ async function renderAnalysis(){
     addScore(r.horse_no, r.horse_name_zh, 'trainerJockeyScore', s);
   });
 
-  // === 計 totalScore，同時準備排名用 ===
-  const summaryList = Array.from(scoreMap.values());
+  // 11.9 組成 list + 計 totalScore
+  const summaryList = Array.from(scoreMap.values()).map(r => {
+    const total = [
+      r.horseScore,
+      r.weightScore,
+      r.drawScore,
+      r.horseDrawScore,
+      r.horseDistScore,
+      r.jockeyDistScore,
+      r.trainerDistScore,
+      r.horseJockeyScore,
+      r.trainerJockeyScore
+    ].reduce((sum, x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? sum + n : sum;
+    }, 0);
+    r.totalScore = total;
+    return r;
+  }).sort((a,b)=> Number(a.horse_no||0) - Number(b.horse_no||0));
+
+  // 11.10 計每個項目 top 1–5 排名（用嚴格次序，分數相同會同一 rank）
+  const metricKeys = [
+    'horseScore',
+    'weightScore',
+    'drawScore',
+    'horseDrawScore',
+    'horseDistScore',
+    'jockeyDistScore',
+    'trainerDistScore',
+    'horseJockeyScore',
+    'trainerJockeyScore',
+    'totalScore'
+  ];
+  const metricRanks = {};
+
+  metricKeys.forEach(key => {
+    const arr = summaryList
+      .filter(r => Number.isFinite(Number(r[key])))
+      .slice()
+      .sort((a,b)=> Number(b[key]) - Number(a[key])); // 由大至小
+
+    const ranks = {};
+    let currentRank = 0;
+    let lastVal = null;
+
+    for (const r of arr) {
+      const val = Number(r[key]);
+      if (!Number.isFinite(val)) continue;
+
+      if (lastVal === null || val < lastVal - 1e-9) {
+        currentRank += 1;
+        if (currentRank > 5) break;  // 只要頭 5 名
+        lastVal = val;
+      }
+      ranks[String(r.horse_no)] = currentRank;
+    }
+    metricRanks[key] = ranks;
+  });
+
+  function rankClass(metricKey, horseNo){
+    const map = metricRanks[metricKey] || {};
+    const rk = map[String(horseNo)];
+    return rk ? `score-r${rk}` : '';
+  }
 
   if (!summaryList.length){
     tbodySummary.innerHTML =
       `<tr><td colspan="12" class="muted">暫時沒有綜合評分資料。</td></tr>`;
   } else {
-    // 先計每匹馬 totalScore
-    summaryList.forEach(r => {
-      const total = [
-        r.horseScore,
-        r.weightScore,
-        r.drawScore,
-        r.horseDrawScore,
-        r.horseDistScore,
-        r.jockeyDistScore,
-        r.trainerDistScore,
-        r.horseJockeyScore,
-        r.trainerJockeyScore
-      ].reduce((sum, x) => {
-        const n = Number(x);
-        return Number.isFinite(n) ? sum + n : sum;
-      }, 0);
-      r.totalScore = total;
-    });
-
-    // 按 totalScore 由高至低排，拎出排名
-    const sortedByTotal = [...summaryList].sort(
-      (a, b) => (b.totalScore || 0) - (a.totalScore || 0)
-    );
-
-    const rankByHorseNo = new Map();
-    sortedByTotal.forEach((r, idx) => {
-      if (Number.isFinite(r.totalScore) && r.totalScore > 0) {
-        rankByHorseNo.set(String(r.horse_no), idx + 1); // 第 1 名 = 1
-      }
-    });
-
-    // 顯示時仍然用馬號排序
-    summaryList.sort(
-      (a, b) => Number(a.horse_no || 0) - Number(b.horse_no || 0)
-    );
-
-    tbodySummary.innerHTML = summaryList.map(r => {
-      const total = r.totalScore || 0;
-      const rank = rankByHorseNo.get(String(r.horse_no));
-
-      let rowClass = '';
-      if (rank === 1) rowClass = 'rank-top1';
-      else if (rank === 2) rowClass = 'rank-top2';
-      else if (rank === 3) rowClass = 'rank-top3';
-      else if (rank === 4) rowClass = 'rank-top4';
-      else if (rank === 5) rowClass = 'rank-top5';
-
-      return `
-        <tr class="${rowClass}">
-          <td>${r.horse_no ?? ''}</td>
-          <td>${r.horse_name_zh || ''}</td>
-          <td>${fmtScore(r.horseScore)}</td>
-          <td>${fmtScore(r.weightScore)}</td>
-          <td>${fmtScore(r.drawScore)}</td>
-          <td>${fmtScore(r.horseDrawScore)}</td>
-          <td>${fmtScore(r.horseDistScore)}</td>
-          <td>${fmtScore(r.jockeyDistScore)}</td>
-          <td>${fmtScore(r.trainerDistScore)}</td>
-          <td>${fmtScore(r.horseJockeyScore)}</td>
-          <td>${fmtScore(r.trainerJockeyScore)}</td>
-          <td>${fmtScore(total)}</td>
-        </tr>
-      `;
-    }).join('');
+    tbodySummary.innerHTML = summaryList.map(r => `
+      <tr>
+        <td>${r.horse_no ?? ''}</td>
+        <td>${r.horse_name_zh || ''}</td>
+        <td class="${rankClass('horseScore', r.horse_no)}">${fmtScore(r.horseScore)}</td>
+        <td class="${rankClass('weightScore', r.horse_no)}">${fmtScore(r.weightScore)}</td>
+        <td class="${rankClass('drawScore', r.horse_no)}">${fmtScore(r.drawScore)}</td>
+        <td class="${rankClass('horseDrawScore', r.horse_no)}">${fmtScore(r.horseDrawScore)}</td>
+        <td class="${rankClass('horseDistScore', r.horse_no)}">${fmtScore(r.horseDistScore)}</td>
+        <td class="${rankClass('jockeyDistScore', r.horse_no)}">${fmtScore(r.jockeyDistScore)}</td>
+        <td class="${rankClass('trainerDistScore', r.horse_no)}">${fmtScore(r.trainerDistScore)}</td>
+        <td class="${rankClass('horseJockeyScore', r.horse_no)}">${fmtScore(r.horseJockeyScore)}</td>
+        <td class="${rankClass('trainerJockeyScore', r.horse_no)}">${fmtScore(r.trainerJockeyScore)}</td>
+        <td class="${rankClass('totalScore', r.horse_no)}">${fmtScore(r.totalScore)}</td>
+      </tr>
+    `).join('');
   }
 }
 
